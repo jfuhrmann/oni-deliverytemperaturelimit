@@ -1,0 +1,11 @@
+A copy of part of PLib from https://github.com/peterhaneve/ONIMods is included.
+Source revision : a25d1e4e19935b80812d37aef370320769a0c32f
+
+PLib docs suggest to use ILMerge, but I have no idea how to use it on Linux,
+and also the repo is now read-only, so possibly obsolete. Copying the libs
+here and compiling them directly should have the same result.
+
+Changes:
+Removed *.csproj files.
+Removed AssemblyInfo.cs files.
+Fixed warnings.
