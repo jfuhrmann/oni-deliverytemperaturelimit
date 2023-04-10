@@ -1,0 +1,3 @@
+title: "Delivery Temperature Limit"
+description: "Limit temperature range of objects that may be delivered to buildings"
+staticID: "llunak.DeliveryTemperatureLimit"
