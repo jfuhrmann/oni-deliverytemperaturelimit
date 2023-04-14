@@ -177,22 +177,30 @@ namespace DeliveryTemperatureLimit
 
         private void OnTextChangedLow(GameObject source, string text)
         {
-            OnTextChanged( text, (float v) => SetLowValue( v ), target.MinValue );
+            if( target.IsDisabled())
+                SetHighValue( target.MaxValue ); // fill in a value in the other one
+            float value = OnTextChanged( text, (float v) => SetLowValue( v ), target.MinValue );
+            if( value != -1 && value > target.HighLimit )
+                SetHighValue( value );
         }
 
         private void OnTextChangedHigh(GameObject source, string text)
         {
-            OnTextChanged( text, (float v) => SetHighValue( v ), target.MaxValue );
+            if( target.IsDisabled())
+                SetLowValue( target.MinValue ); // fill in a value in the other one
+            float value = OnTextChanged( text, (float v) => SetHighValue( v ), target.MaxValue );
+            if( value != -1 && value < target.LowLimit )
+                SetLowValue( value );
         }
 
-        private void OnTextChanged( string text, Action< float > setValueFunc, float fallback )
+        private float OnTextChanged( string text, Action< float > setValueFunc, float fallback )
         {
             text = text.Trim();
             if( string.IsNullOrEmpty( text ))
             {
                 target.Disable();
                 EmptyInputs();
-                return;
+                return -1;
             }
             // TryParse() can't handle extra text at the end (temperature unit),
             // so strip it if it's there
@@ -204,36 +212,25 @@ namespace DeliveryTemperatureLimit
             else
                 result = fallback;
             setValueFunc( result );
+            return result;
         }
 
         private void SetLowValue( float value )
         {
             SetValue( value, lowInput,
                 (float v) => target.SetLowLimit( v ),
-                () => target.LowLimit,
-                (float v) =>
-                {
-                    if( v > target.HighLimit )
-                        SetHighValue( v );
-                }
-                );
+                () => target.LowLimit                );
         }
 
         private void SetHighValue( float value )
         {
             SetValue( value, highInput,
                 (float v) => target.SetHighLimit( v ),
-                () => target.HighLimit,
-                (float v) =>
-                {
-                    if( v < target.LowLimit )
-                        SetLowValue( v );
-                }
-                );
+                () => target.HighLimit                );
         }
 
         private void SetValue( float value, GameObject input, Action< float > setTargetFunc,
-            Func< float > targetValueFunc, Action< float > checkOtherFunc )
+            Func< float > targetValueFunc )
         {
             setTargetFunc( value );
             value = targetValueFunc(); // maybe clamped, so re-read
@@ -242,7 +239,6 @@ namespace DeliveryTemperatureLimit
                 GameUtil.TemperatureInterpretation.Absolute, true);
             if( field.text != text )
                 field.text = text;
-            checkOtherFunc( value );
         }
 
         private void EmptyInputs()
