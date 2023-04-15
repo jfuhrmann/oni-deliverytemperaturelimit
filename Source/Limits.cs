@@ -5,6 +5,7 @@ using PeterHan.PLib.Core;
 using PeterHan.PLib.UI;
 using TMPro;
 using System;
+using STRINGS;
 
 namespace DeliveryTemperatureLimit
 {
@@ -109,28 +110,26 @@ namespace DeliveryTemperatureLimit
             {
                     Type = PTextField.FieldType.Float,
                     OnTextChanged = OnTextChangedLow,
-                    ToolTip = "a"
             };
             lowInputField.SetMinWidthInCharacters(6);
             lowInputField.AddOnRealize((obj) => lowInput = obj);
             PTextField highInputField = new PTextField( "highLimit" )
-                {
-                    Type = PTextField.FieldType.Float,
-                    OnTextChanged = OnTextChangedHigh,
-                    ToolTip = "a"
-                };
+            {
+                Type = PTextField.FieldType.Float,
+                OnTextChanged = OnTextChangedHigh,
+            };
             highInputField.SetMinWidthInCharacters(6);
             highInputField.AddOnRealize((obj) => highInput = obj);
             PLabel label = new PLabel( "label" )
-                {
-                    TextStyle = PUITuning.Fonts.TextDarkStyle,
-                    Text = STRINGS.TEMPERATURELIMITS.LABEL
-                };
+            {
+                TextStyle = PUITuning.Fonts.TextDarkStyle,
+                Text = STRINGS.TEMPERATURELIMITS.LABEL
+            };
             PLabel separator = new PLabel( "separator" )
-                {
-                    TextStyle = PUITuning.Fonts.TextDarkStyle,
-                    Text = STRINGS.TEMPERATURELIMITS.RANGE_SEPARATOR
-                };
+            {
+                TextStyle = PUITuning.Fonts.TextDarkStyle,
+                Text = STRINGS.TEMPERATURELIMITS.RANGE_SEPARATOR
+            };
             panel.AddChild( label );
             panel.AddChild( lowInputField );
             panel.AddChild( separator );
@@ -173,6 +172,7 @@ namespace DeliveryTemperatureLimit
                 SetLowValue( target.LowLimit );
                 SetHighValue( target.HighLimit );
             }
+            UpdateToolTip();
         }
 
         private void OnTextChangedLow(GameObject source, string text)
@@ -182,6 +182,7 @@ namespace DeliveryTemperatureLimit
             float value = OnTextChanged( text, (float v) => SetLowValue( v ), target.MinValue );
             if( value != -1 && value > target.HighLimit )
                 SetHighValue( value );
+            UpdateToolTip();
         }
 
         private void OnTextChangedHigh(GameObject source, string text)
@@ -191,6 +192,7 @@ namespace DeliveryTemperatureLimit
             float value = OnTextChanged( text, (float v) => SetHighValue( v ), target.MaxValue );
             if( value != -1 && value < target.LowLimit )
                 SetLowValue( value );
+            UpdateToolTip();
         }
 
         private float OnTextChanged( string text, Action< float > setValueFunc, float fallback )
@@ -250,6 +252,21 @@ namespace DeliveryTemperatureLimit
             };
             resetInput( lowInput.GetComponent< TMP_InputField >());
             resetInput( highInput.GetComponent< TMP_InputField >());
+        }
+
+        private void UpdateToolTip()
+        {
+            string tooltip;
+            if( !target.IsDisabled())
+                tooltip  = string.Format(STRINGS.TEMPERATURELIMITS.TOOLTIP_RANGE,
+                    GameUtil.GetFormattedTemperature(target.LowLimit, GameUtil.TimeSlice.None,
+                        GameUtil.TemperatureInterpretation.Absolute, true),
+                    GameUtil.GetFormattedTemperature(target.HighLimit, GameUtil.TimeSlice.None,
+                        GameUtil.TemperatureInterpretation.Absolute, true));
+            else
+                tooltip = STRINGS.TEMPERATURELIMITS.TOOLTIP_NOTSET;
+            PUIElements.SetToolTip( lowInput, tooltip );
+            PUIElements.SetToolTip( highInput, tooltip );
         }
     }
 
