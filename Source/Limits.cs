@@ -70,16 +70,15 @@ namespace DeliveryTemperatureLimit
         }
     }
 
-        [HarmonyPatch(typeof(DetailsScreen))]
-        [HarmonyPatch("OnPrefabInit")]
-        public static class DetailsScreen_OnPrefabInit_Patch
+    [HarmonyPatch(typeof(DetailsScreen))]
+    [HarmonyPatch("OnPrefabInit")]
+    public static class DetailsScreen_OnPrefabInit_Patch
+    {
+        public static void Postfix()
         {
-            public static void Postfix()
-            {
-                PUIUtils.AddSideScreenContent<TemperatureLimitsSideScreen>();
-            }
+            PUIUtils.AddSideScreenContent<TemperatureLimitsSideScreen>();
         }
-
+    }
 
     public class TemperatureLimitsSideScreen : SideScreenContent
     {
@@ -221,14 +220,14 @@ namespace DeliveryTemperatureLimit
         {
             SetValue( value, lowInput,
                 (float v) => target.SetLowLimit( v ),
-                () => target.LowLimit                );
+                () => target.LowLimit );
         }
 
         private void SetHighValue( float value )
         {
             SetValue( value, highInput,
                 (float v) => target.SetHighLimit( v ),
-                () => target.HighLimit                );
+                () => target.HighLimit );
         }
 
         private void SetValue( float value, GameObject input, Action< float > setTargetFunc,
