@@ -67,6 +67,11 @@ namespace DeliveryTemperatureLimit
             UpdateInputs();
         }
 
+        public override int GetSideScreenSortOrder()
+        {
+            return -1; // put below other normal sidescreen content
+        }
+
         public override bool IsValidForTarget(GameObject target)
         {
             return target.GetComponent<TemperatureLimits>() != null;

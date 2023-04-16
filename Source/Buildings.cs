@@ -16,9 +16,9 @@ namespace DeliveryTemperatureLimit
                nameof(ObjectDispenserConfig),
                nameof(OrbitalCargoModuleConfig),
                nameof(SolidConduitInboxConfig),
-#if false
                nameof(BottleEmptierConfig),
                nameof(BottleEmptierGasConfig),
+#if false
                nameof(WaterCoolerConfig),
                nameof(JuicerConfig),
                nameof(SublimationStationConfig),
