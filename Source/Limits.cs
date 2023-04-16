@@ -308,6 +308,40 @@ namespace DeliveryTemperatureLimit
         }
     }
 
+    [HarmonyPatch(typeof(ObjectDispenserConfig))]
+    public class ObjectDispenserConfig_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(DoPostConfigureComplete))]
+        public static void DoPostConfigureComplete(GameObject go)
+        {
+            go.AddOrGet<TemperatureLimits>();
+        }
+    }
+
+    [HarmonyPatch(typeof(OrbitalCargoModuleConfig))]
+    public class OrbitalCargoModuleConfig_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(DoPostConfigureComplete))]
+        public static void DoPostConfigureComplete(GameObject go)
+        {
+            go.AddOrGet<TemperatureLimits>();
+        }
+    }
+
+    [HarmonyPatch(typeof(SolidConduitInboxConfig))]
+    public class SolidConduitInboxConfig_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(DoPostConfigureComplete))]
+        public static void DoPostConfigureComplete(GameObject go)
+        {
+            go.AddOrGet<TemperatureLimits>();
+        }
+    }
+
+#if false
     [HarmonyPatch(typeof(BottleEmptierConfig))]
     public class BottleEmptierConfig_Patch
     {
@@ -473,17 +507,6 @@ namespace DeliveryTemperatureLimit
         }
     }
 
-    [HarmonyPatch(typeof(ObjectDispenserConfig))]
-    public class ObjectDispenserConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
     [HarmonyPatch(typeof(OuthouseConfig))]
     public class OuthouseConfig_Patch
     {
@@ -616,17 +639,6 @@ namespace DeliveryTemperatureLimit
         }
     }
 
-    [HarmonyPatch(typeof(OrbitalCargoModuleConfig))]
-    public class OrbitalCargoModuleConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
     [HarmonyPatch(typeof(CreatureFeederConfig))]
     public class CreatureFeederConfig_Patch
     {
@@ -637,4 +649,5 @@ namespace DeliveryTemperatureLimit
             go.AddOrGet<TemperatureLimits>();
         }
     }
+ #endif
 }
