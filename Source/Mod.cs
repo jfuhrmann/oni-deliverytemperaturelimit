@@ -9,6 +9,7 @@ namespace DeliveryTemperatureLimit
         {
             base.OnLoad( harmony );
             PUtil.InitLibrary( false );
+            Buildings_Patch.Patch( harmony );
             ClearableManager_Patch.Patch( harmony );
         }
     }

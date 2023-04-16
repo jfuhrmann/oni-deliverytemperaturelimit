@@ -1,372 +1,65 @@
 using HarmonyLib;
 using UnityEngine;
+using System.Reflection;
 
 namespace DeliveryTemperatureLimit
 {
     // Add to all buildings where this makes sense.
-
-    [HarmonyPatch(typeof(StorageLockerSmartConfig))]
-    public class StorageLockerSmartConfig_Patch
+    public class Buildings_Patch
     {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
+        public static void Patch( Harmony harmony )
         {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(StorageLockerConfig))]
-    public class StorageLockerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(ObjectDispenserConfig))]
-    public class ObjectDispenserConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(OrbitalCargoModuleConfig))]
-    public class OrbitalCargoModuleConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(SolidConduitInboxConfig))]
-    public class SolidConduitInboxConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
+            string[] configs =
+            {
+               nameof(StorageLockerSmartConfig),
+               nameof(StorageLockerConfig),
+               nameof(ObjectDispenserConfig),
+               nameof(OrbitalCargoModuleConfig),
+               nameof(SolidConduitInboxConfig),
 #if false
-    [HarmonyPatch(typeof(BottleEmptierConfig))]
-    public class BottleEmptierConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
+               nameof(BottleEmptierConfig),
+               nameof(BottleEmptierGasConfig),
+               nameof(WaterCoolerConfig),
+               nameof(JuicerConfig),
+               nameof(SublimationStationConfig),
+               nameof(AlgaeHabitatConfig),
+               nameof(WoodGasGeneratorConfig),
+               nameof(ResearchCenterConfig),
+               nameof(AdvancedResearchCenterConfig),
+               nameof(RustDeoxidizerConfig),
+               nameof(MechanicalSurfboardConfig),
+               nameof(IceMachineConfig),
+               nameof(WashBasinConfig),
+               nameof(FarmStationConfig),
+               nameof(EspressoMachineConfig),
+               nameof(OuthouseConfig),
+               nameof(SodaFountainConfig),
+               nameof(PlanterBoxConfig),
+               nameof(CompostConfig),
+               nameof(AirFilterConfig),
+               nameof(AlgaeDistilleryConfig),
+               nameof(WaterPurifierConfig),
+               nameof(OxyliteRefineryConfig),
+               nameof(MineralDeoxidizerConfig),
+               nameof(HandSanitizerConfig),
+               nameof(FertilizerMakerConfig),
+               nameof(DiningTableConfig),
+               nameof(CreatureFeederConfig),
+#endif
+            };
+            foreach( string config in configs )
+            {
+                MethodInfo info = AccessTools.Method( config + ":DoPostConfigureComplete");
+                if( info != null )
+                    harmony.Patch( info, prefix: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
+                else
+                    Debug.LogError( "DeliveryTemperatureLimit: Failed to patch DoPostConfigureComplete() for " + config );
+            }
         }
-    }
 
-    [HarmonyPatch(typeof(BottleEmptierGasConfig))]
-    public class BottleEmptierGasConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
         public static void DoPostConfigureComplete(GameObject go)
         {
             go.AddOrGet<TemperatureLimits>();
         }
     }
-
-    [HarmonyPatch(typeof(WaterCoolerConfig))]
-    public class WaterCoolerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(JuicerConfig))]
-    public class JuicerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(SublimationStationConfig))]
-    public class SublimationStationConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(AlgaeHabitatConfig))]
-    public class AlgaeHabitatConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(WoodGasGeneratorConfig))]
-    public class WoodGasGeneratorConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(ResearchCenterConfig))]
-    public class ResearchCenterConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(AdvancedResearchCenterConfig))]
-    public class AdvancedResearchCenterConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(RustDeoxidizerConfig))]
-    public class RustDeoxidizerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(MechanicalSurfboardConfig))]
-    public class MechanicalSurfboardConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(IceMachineConfig))]
-    public class IceMachineConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(WashBasinConfig))]
-    public class WashBasinConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(FarmStationConfig))]
-    public class FarmStationConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(EspressoMachineConfig))]
-    public class EspressoMachineConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(OuthouseConfig))]
-    public class OuthouseConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(SodaFountainConfig))]
-    public class SodaFountainConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(PlanterBoxConfig))]
-    public class PlanterBoxConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(CompostConfig))]
-    public class CompostConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(AirFilterConfig))]
-    public class AirFilterConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(AlgaeDistilleryConfig))]
-    public class AlgaeDistilleryConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(WaterPurifierConfig))]
-    public class WaterPurifierConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(OxyliteRefineryConfig))]
-    public class OxyliteRefineryConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(MineralDeoxidizerConfig))]
-    public class MineralDeoxidizerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(HandSanitizerConfig))]
-    public class HandSanitizerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(FertilizerMakerConfig))]
-    public class FertilizerMakerConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(DiningTableConfig))]
-    public class DiningTableConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
-
-    [HarmonyPatch(typeof(CreatureFeederConfig))]
-    public class CreatureFeederConfig_Patch
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(DoPostConfigureComplete))]
-        public static void DoPostConfigureComplete(GameObject go)
-        {
-            go.AddOrGet<TemperatureLimits>();
-        }
-    }
- #endif
 }
