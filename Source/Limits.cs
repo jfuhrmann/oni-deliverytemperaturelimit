@@ -6,6 +6,8 @@ using PeterHan.PLib.UI;
 using TMPro;
 using System;
 using STRINGS;
+using System.Collections.Generic;
+using System.Reflection.Emit;
 
 namespace DeliveryTemperatureLimit
 {
@@ -282,6 +284,88 @@ namespace DeliveryTemperatureLimit
             if( limits == null || limits.IsDisabled())
                 return;
             __result = limits.AllowedByTemperature( pickup.PrimaryElement.Temperature );
+        }
+    }
+
+    // If something to fetch is found, this class tries to find similar objects and add them
+    // to the fetch, and it doesn't use IsFetchablePickup(), it only compares the two fetches,
+    // so patch the code to check as well.
+    [HarmonyPatch(typeof(FetchAreaChore.StatesInstance))]
+    public static class FetchAreaChore_StatesInstance_Patch
+    {
+        [HarmonyTranspiler]
+        [HarmonyPatch(nameof(Begin))]
+        public static IEnumerable<CodeInstruction> Begin(IEnumerable<CodeInstruction> instructions)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+            bool found1 = false;
+            bool found2 = false;
+            int rootChoreLoad = -1;
+            for( int i = 0; i < codes.Count; ++i )
+            {
+//                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                if( codes[ i ].opcode == OpCodes.Ldarg_0 && i + 1 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Ldfld && codes[ i + 1 ].operand.ToString() == "FetchChore rootChore" )
+                {
+                    rootChoreLoad = i;
+                }
+                // The function has code:
+                // if (... && rootContext.consumerState.consumer.CanReach(pickupable2))
+                // Add:
+                // if (... && Begin_Hook1( rootChore, pickupable2 ))
+                if( rootChoreLoad != -1 && codes[ i ].opcode == OpCodes.Ldloc_S && i + 2 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Callvirt && codes[ i + 1 ].operand.ToString() == "Boolean CanReach(IApproachable)"
+                    && codes[ i + 2 ].opcode == OpCodes.Brfalse_S )
+                {
+                    codes.Insert( i + 3, codes[ rootChoreLoad ].Clone());
+                    codes.Insert( i + 4, codes[ rootChoreLoad + 1 ].Clone()); // load 'rootChore'
+                    codes.Insert( i + 5, codes[ i ].Clone()); // load 'pickupable2'
+                    codes.Insert( i + 6, new CodeInstruction( OpCodes.Call,
+                        typeof( FetchAreaChore_StatesInstance_Patch ).GetMethod( nameof( Begin_Hook1 ))));
+                    codes.Insert( i + 7, codes[ i + 2 ].Clone()); // if false
+                    found1 = true;
+                }
+                // The function has code:
+                // if (... && fetchChore2.forbidHash == rootChore.forbidHash)
+                // Add:
+                // if (... && Begin_Hook2( rootChore, fetchChore2 ))
+                if( codes[ i ].opcode == OpCodes.Brfalse_S && i + 6 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Ldloc_S && codes[ i + 1 ].operand.ToString().StartsWith( "FetchChore" )
+                    && codes[ i + 2 ].opcode == OpCodes.Ldfld && codes[ i + 2 ].operand.ToString() == "System.Int32 forbidHash"
+                    && codes[ i + 3 ].opcode == OpCodes.Ldarg_0
+                    && codes[ i + 4 ].opcode == OpCodes.Ldfld && codes[ i + 4 ].operand.ToString() == "FetchChore rootChore"
+                    && codes[ i + 5 ].opcode == OpCodes.Ldfld && codes[ i + 5 ].operand.ToString() == "System.Int32 forbidHash"
+                    && codes[ i + 6 ].opcode == OpCodes.Bne_Un_S )
+                {
+                    codes.Insert( i + 7, codes[ i + 3 ].Clone());
+                    codes.Insert( i + 8, codes[ i + 4 ].Clone()); // load 'rootChore'
+                    codes.Insert( i + 9, codes[ i + 1 ].Clone()); // load 'fetchChore2'
+                    codes.Insert( i + 10, new CodeInstruction( OpCodes.Call,
+                        typeof( FetchAreaChore_StatesInstance_Patch ).GetMethod( nameof( Begin_Hook2 ))));
+                    codes.Insert( i + 11, codes[ i ].Clone()); // if false
+                    found2 = true;
+                }
+            }
+            if(!found1 || !found2)
+                Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FetchAreaChore.StatesInstance.Begin()");
+            return codes;
+        }
+
+        public static bool Begin_Hook1( FetchChore rootChore, Pickupable pickupable2 )
+        {
+            TemperatureLimits limits = rootChore.destination?.GetComponent< TemperatureLimits >();
+            if( limits == null || limits.IsDisabled())
+                return true;
+            return limits.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
+        }
+
+        public static bool Begin_Hook2( FetchChore rootChore, FetchChore fetchChore2 )
+        {
+            TemperatureLimits limits = rootChore?.destination?.GetComponent< TemperatureLimits >();
+            Pickupable pickupable2 = fetchChore2?.fetchTarget;
+            if( limits == null || limits.IsDisabled() || pickupable2 == null )
+                return true;
+            return limits.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
         }
     }
 
