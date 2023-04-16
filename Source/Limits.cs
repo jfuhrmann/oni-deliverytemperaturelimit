@@ -441,6 +441,150 @@ namespace DeliveryTemperatureLimit
         }
     }
 
+    [HarmonyPatch(typeof(GlobalChoreProvider))]
+    public class GlobalChoreProvider_Patch
+    {
+        // List of allowed temperature ranges for each tag.
+        private class TagData
+        {
+            // Low/high limit. If not set (null), there's no limit.
+            public List< ValueTuple< float, float >> limits;
+        }
+        // Stored for each GlobalChoreProvider.
+        private class PerProviderData
+        {
+            public Dictionary< Tag, TagData > tagData = new Dictionary< Tag, TagData >();
+        }
+        private static Dictionary< GlobalChoreProvider, PerProviderData > storageFetchableTagsWithTemperature
+            = new Dictionary< GlobalChoreProvider, PerProviderData >();
+        // Optimization, look it up just once in the first hook.
+        private static PerProviderData currentProvider = null;
+
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(ClearableHasDestination))]
+        public static void ClearableHasDestination(GlobalChoreProvider __instance, ref bool __result, Pickupable pickupable)
+        {
+            if( !__result ) // Has no destination already without temperature check.
+                return;
+            PerProviderData perProvider = storageFetchableTagsWithTemperature[ __instance ];
+            if( perProvider == null )
+                return;
+            KPrefabID kPrefabID = pickupable.KPrefabID;
+            TagData tagData;
+            if( !perProvider.tagData.TryGetValue( kPrefabID.PrefabTag, out tagData ))
+            {
+                __result = false; // tag not included => not allowed
+                return;
+            }
+            if( tagData.limits == null ) // All allowed.
+                return;
+            if( pickupable.PrimaryElement == null )
+                return;
+            float temperature = pickupable.PrimaryElement.Temperature;
+            foreach( ValueTuple< float, float > limit in tagData.limits )
+            {
+                if( limit.Item1 <= temperature && temperature <= limit.Item2 )
+                    return; // ok, found a valid range
+            }
+            __result = false; // no storage that'd allow the temperature
+        }
+
+        // This function updates a hash of allowed tags for ClearableHasDestination.
+        // Patch it to build our information that includes temperature limits.
+        [HarmonyTranspiler]
+        [HarmonyPatch(nameof(UpdateStorageFetchableBits))]
+        public static IEnumerable<CodeInstruction> UpdateStorageFetchableBits(IEnumerable<CodeInstruction> instructions)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+            // Insert 'UpdateStorageFetchableBits_Hook1( this )' at the beginning.
+            codes.Insert( 0, new CodeInstruction( OpCodes.Ldarg_0 )); // load 'this'
+            codes.Insert( 1, new CodeInstruction( OpCodes.Call,
+                typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook1 ))));
+            bool found = false;
+            for( int i = 0; i < codes.Count; ++i )
+            {
+//                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                // The function has code:
+                // storageFetchableTags.UnionWith(fetchChore.tags);
+                // Append:
+                // UpdateStorageFetchableBits_Hook2(fetchChore);
+                if( codes[ i ].opcode == OpCodes.Ldarg_0
+                    && i + 4 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Ldfld
+                    && codes[ i + 1 ].operand.ToString().EndsWith( "storageFetchableTags" )
+                    && codes[ i + 2 ].opcode == OpCodes.Ldloc_S
+                    && codes[ i + 2 ].operand.ToString().StartsWith( "FetchChore (" )
+                    && codes[ i + 3 ].opcode == OpCodes.Ldfld
+                    && codes[ i + 3 ].operand.ToString().EndsWith( "tags" )
+                    && codes[ i + 4 ].opcode == OpCodes.Callvirt
+                    && codes[ i + 4 ].operand.ToString().StartsWith( "Void UnionWith(" ))
+                {
+                    codes.Insert( i + 5, codes[ i + 2 ].Clone()); // load 'fetchChore'
+                    codes.Insert( i + 6, new CodeInstruction( OpCodes.Call,
+                        typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook2 ))));
+                    found = true;
+                }
+            }
+            if(!found)
+                Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch GlobalChoreProvider.UpdateStorageFetchableBits()");
+            return codes;
+        }
+
+        public static void UpdateStorageFetchableBits_Hook1(GlobalChoreProvider provider)
+        {
+            if( !storageFetchableTagsWithTemperature.TryGetValue( provider, out currentProvider ))
+            {
+                currentProvider = new PerProviderData();
+                storageFetchableTagsWithTemperature[ provider ] = currentProvider;
+            }
+            currentProvider.tagData.Clear();
+        }
+
+        public static void UpdateStorageFetchableBits_Hook2(FetchChore chore)
+        {
+            TemperatureLimits limits = chore.destination.GetComponent< TemperatureLimits >();
+            if( limits == null || limits.IsDisabled())
+            {
+                foreach( Tag tag in chore.tags )
+                {
+                    TagData tagData;
+                    if( !currentProvider.tagData.TryGetValue( tag, out tagData ))
+                    {
+                        tagData = new TagData();
+                        currentProvider.tagData[ tag ] = tagData;
+                    }
+                    else if( tagData.limits != null )
+                        tagData.limits = null; // All allowed.
+                }
+                return;
+            }
+            foreach( Tag tag in chore.tags )
+            {
+                TagData tagData;
+                if( !currentProvider.tagData.TryGetValue( tag, out tagData ))
+                {
+                    tagData = new TagData();
+                    // We will be adding a limit, so set up the list (which means not all are allowed).
+                    tagData.limits = new List< ValueTuple< float, float >>();
+                    currentProvider.tagData[ tag ] = tagData;
+                }
+                if( tagData.limits == null ) // All allowed.
+                    continue;
+                bool found = false;
+                foreach( ValueTuple< float, float > limitItem in tagData.limits )
+                {
+                    if( limitItem.Item1 <= limits.LowLimit && limits.HighLimit <= limitItem.Item2 )
+                    {
+                        found = true;
+                        break; // ok, included in another range
+                    }
+                }
+                if( !found )
+                    tagData.limits.Add( ValueTuple.Create( limits.LowLimit, limits.HighLimit ));
+            }
+        }
+    }
+
     // Now add to all buildings where this makes sense.
     [HarmonyPatch(typeof(StorageLockerSmartConfig))]
     public class StorageLockerSmartConfig_Patch
