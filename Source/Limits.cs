@@ -7,6 +7,7 @@ using TMPro;
 using System;
 using STRINGS;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DeliveryTemperatureLimit
@@ -287,39 +288,74 @@ namespace DeliveryTemperatureLimit
         }
     }
 
-    [HarmonyPatch(typeof(FetchChore))]
-    public class FetchChore_Patch
+    // Clearable means objects explicitly marked for sweeping. The code apparently does not
+    // use IsFetchablePickup() and somehow only compares fetches, so patch it to check too.
+    // Class is internal, needs to be patched manually.
+    public class ClearableManager_Patch
     {
-        private static Chore.Precondition IsAllowedByTemperatureLimit = new Chore.Precondition
+        public static void Patch( Harmony harmony )
         {
-            id = "DTL.IsAllowedByTemperatureLimit",
-            description = DUPLICANTS.CHORES.PRECONDITIONS.IS_ALLOWED_BY_AUTOMATION, // TODO
-            fn = delegate(ref Chore.Precondition.Context context, object data)
-            {
-                Pickupable pickupable = context.data as Pickupable;
-                if( pickupable?.PrimaryElement != null )
-                    return ((TemperatureLimits)data).AllowedByTemperature( pickupable.PrimaryElement.Temperature );
-                pickupable = (context.chore as FetchChore)?.fetchTarget;
-                if( pickupable?.PrimaryElement != null )
-                    return ((TemperatureLimits)data).AllowedByTemperature( pickupable.PrimaryElement.Temperature );
-                return true;
-            }
-        };
+            MethodInfo info = AccessTools.Method( "ClearableManager:CollectChores" );
+            if( info != null )
+                harmony.Patch( info, transpiler: new HarmonyMethod(
+                    typeof( ClearableManager_Patch ).GetMethod( "CollectChores" )));
+        }
 
-        [HarmonyPostfix]
-        [HarmonyPatch(MethodType.Constructor, new Type[] { typeof(ChoreType), typeof(Storage), typeof(float),
-            typeof(HashSet<Tag>), typeof(FetchChore.MatchCriteria), typeof(Tag), typeof(Tag[]),
-            typeof(ChoreProvider), typeof(bool), typeof(Action<Chore>), typeof(Action<Chore>),
-            typeof(Action<Chore>), typeof(Operational.State), typeof(int) })]
-        public static void ctor( FetchChore __instance, ChoreType choreType, Storage destination, float amount,
-            HashSet<Tag> tags, FetchChore.MatchCriteria criteria, Tag required_tag, Tag[] forbidden_tags,
-            ChoreProvider chore_provider, bool run_until_complete, Action<Chore> on_complete,
-            Action<Chore> on_begin, Action<Chore> on_end,
-            Operational.State operational_requirement, int priority_mod )
+        public static IEnumerable<CodeInstruction> CollectChores(IEnumerable<CodeInstruction> instructions)
         {
-            TemperatureLimits limits = destination?.GetComponent< TemperatureLimits >();
-            if( limits )
-                __instance.AddPrecondition( IsAllowedByTemperatureLimit, limits );
+            var codes = new List<CodeInstruction>(instructions);
+            bool found = false;
+            int pickupableLoad = -1;
+            for( int i = 0; i < codes.Count; ++i )
+            {
+//                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                if( codes[ i ].opcode == OpCodes.Ldloc_S
+                    && codes[ i ].operand.ToString().StartsWith( "Pickupable (" ))
+                {
+                    pickupableLoad = i;
+                }
+                // The function has code:
+                // if (... && kPrefabID.HasTag(fetch.chore.tagsFirst)))
+                // Add:
+                // if (... && CollectChores_Hook( fetch.chore, pickupable ))
+                // Note that the original code is '(c1 && c2) || (c3 && c4))', so the evaluation
+                // of the condition is a bit more complex.
+                if( pickupableLoad != -1
+                    && codes[ i ].opcode == OpCodes.Ldloc_S && codes[ i ].operand.ToString().StartsWith( "KPrefabID (" )
+                    && i + 9 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Ldloc_S
+                    && codes[ i + 1 ].operand.ToString().StartsWith( "GlobalChoreProvider+Fetch (" )
+                    && codes[ i + 2 ].opcode == OpCodes.Ldfld && codes[ i + 2 ].operand.ToString() == "FetchChore chore"
+                    && codes[ i + 3 ].opcode == OpCodes.Ldfld && codes[ i + 3 ].operand.ToString() == "Tag tagsFirst"
+                    && codes[ i + 4 ].opcode == OpCodes.Callvirt && codes[ i + 4 ].operand.ToString() == "Boolean HasTag(Tag)"
+                    && codes[ i + 5 ].opcode == OpCodes.Br_S
+                    && codes[ i + 6 ].opcode == OpCodes.Ldc_I4_0
+                    && codes[ i + 7 ].opcode == OpCodes.Br_S
+                    && codes[ i + 8 ].opcode == OpCodes.Ldc_I4_1
+                    && codes[ i + 9 ].opcode == OpCodes.Brfalse_S )
+                {
+                    codes.Insert( i + 10, codes[ i + 1 ].Clone());
+                    codes.Insert( i + 11, codes[ i + 2 ].Clone()); // load 'fetch.chore'
+                    codes.Insert( i + 12, codes[ pickupableLoad ].Clone()); // load 'pickupable'
+                    codes.Insert( i + 13, new CodeInstruction( OpCodes.Call,
+                        typeof( ClearableManager_Patch ).GetMethod( nameof( CollectChores_Hook ))));
+                    codes.Insert( i + 14, codes[ i + 9 ].Clone()); // if false
+                    found = true;
+                }
+            }
+            if(!found)
+                Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch ClearableManager.CollectChores()");
+            return codes;
+        }
+
+        public static bool CollectChores_Hook( FetchChore chore, Pickupable pickupable )
+        {
+            TemperatureLimits limits = chore.destination?.GetComponent< TemperatureLimits >();
+            if( limits == null || limits.IsDisabled())
+                return true;
+            if( pickupable?.PrimaryElement != null )
+                return limits.AllowedByTemperature( pickupable.PrimaryElement.Temperature );
+            return true;
         }
     }
 
