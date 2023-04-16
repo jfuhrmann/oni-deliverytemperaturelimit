@@ -287,6 +287,42 @@ namespace DeliveryTemperatureLimit
         }
     }
 
+    [HarmonyPatch(typeof(FetchChore))]
+    public class FetchChore_Patch
+    {
+        private static Chore.Precondition IsAllowedByTemperatureLimit = new Chore.Precondition
+        {
+            id = "DTL.IsAllowedByTemperatureLimit",
+            description = DUPLICANTS.CHORES.PRECONDITIONS.IS_ALLOWED_BY_AUTOMATION, // TODO
+            fn = delegate(ref Chore.Precondition.Context context, object data)
+            {
+                Pickupable pickupable = context.data as Pickupable;
+                if( pickupable?.PrimaryElement != null )
+                    return ((TemperatureLimits)data).AllowedByTemperature( pickupable.PrimaryElement.Temperature );
+                pickupable = (context.chore as FetchChore)?.fetchTarget;
+                if( pickupable?.PrimaryElement != null )
+                    return ((TemperatureLimits)data).AllowedByTemperature( pickupable.PrimaryElement.Temperature );
+                return true;
+            }
+        };
+
+        [HarmonyPostfix]
+        [HarmonyPatch(MethodType.Constructor, new Type[] { typeof(ChoreType), typeof(Storage), typeof(float),
+            typeof(HashSet<Tag>), typeof(FetchChore.MatchCriteria), typeof(Tag), typeof(Tag[]),
+            typeof(ChoreProvider), typeof(bool), typeof(Action<Chore>), typeof(Action<Chore>),
+            typeof(Action<Chore>), typeof(Operational.State), typeof(int) })]
+        public static void ctor( FetchChore __instance, ChoreType choreType, Storage destination, float amount,
+            HashSet<Tag> tags, FetchChore.MatchCriteria criteria, Tag required_tag, Tag[] forbidden_tags,
+            ChoreProvider chore_provider, bool run_until_complete, Action<Chore> on_complete,
+            Action<Chore> on_begin, Action<Chore> on_end,
+            Operational.State operational_requirement, int priority_mod )
+        {
+            TemperatureLimits limits = destination?.GetComponent< TemperatureLimits >();
+            if( limits )
+                __instance.AddPrecondition( IsAllowedByTemperatureLimit, limits );
+        }
+    }
+
     // If something to fetch is found, this class tries to find similar objects and add them
     // to the fetch, and it doesn't use IsFetchablePickup(), it only compares the two fetches,
     // so patch the code to check as well.
