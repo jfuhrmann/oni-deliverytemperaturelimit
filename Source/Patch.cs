@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using UnityEngine;
+using PeterHan.PLib.Options;
 
 namespace DeliveryTemperatureLimit
 {
@@ -315,6 +317,32 @@ namespace DeliveryTemperatureLimit
                 }
                 if( !found )
                     tagData.limits.Add( ValueTuple.Create( limits.LowLimit, limits.HighLimit ));
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(BuildingLoader))]
+    public class BuildingLoader_Patch
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(CreateBuildingUnderConstruction))]
+        public static void CreateBuildingUnderConstruction(ref GameObject __result, BuildingDef def)
+        {
+            Options options = POptions.ReadSettings< Options >();
+            if( options != null && options.UnderConstructionLimit )
+            {
+                TemperatureLimits limits = __result.AddOrGet<TemperatureLimits>();
+                limits.SetLowLimit( GameUtil.GetTemperatureConvertedToKelvin(
+                    options.MinConstructionTemperature, GameUtil.temperatureUnit ));
+                float totalMass = 0;
+                foreach( float mass in def.Mass )
+                    totalMass += mass;
+                if( totalMass > 25 )
+                    limits.SetHighLimit( GameUtil.GetTemperatureConvertedToKelvin(
+                        options.MaxConstructionTemperature, GameUtil.temperatureUnit ));
+                else
+                    limits.SetHighLimit( GameUtil.GetTemperatureConvertedToKelvin(
+                        options.MaxSmallConstructionTemperature, GameUtil.temperatureUnit ));
             }
         }
     }

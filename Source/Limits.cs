@@ -6,9 +6,11 @@ namespace DeliveryTemperatureLimit
     public class TemperatureLimits : KMonoBehaviour
     {
         [Serialize]
+        [SerializeField] // needed so that making copies of an instance copies the private field too
         private float lowLimit = 0; // 0 Kelvin
 
         [Serialize]
+        [SerializeField]
         private float highLimit = 0; // if 0, then not active
 
         public float MinValue => 0f;

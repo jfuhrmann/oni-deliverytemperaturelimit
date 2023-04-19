@@ -200,6 +200,11 @@ namespace DeliveryTemperatureLimit
             PUIElements.SetToolTip( lowInput, tooltip );
             PUIElements.SetToolTip( highInput, tooltip );
         }
+
+        public override string GetTitle()
+        {
+            return STRINGS.TEMPERATURELIMITS.SIDESCREEN_TITLE;
+        }
     }
 
     [HarmonyPatch(typeof(DetailsScreen))]
