@@ -18,6 +18,11 @@ namespace DeliveryTemperatureLimit
                nameof(SolidConduitInboxConfig),
                nameof(BottleEmptierConfig),
                nameof(BottleEmptierGasConfig),
+               nameof(CreatureFeederConfig),
+               nameof(PlanterBoxConfig),
+               nameof(FarmTileConfig),
+               nameof(AirFilterConfig),
+               nameof(WaterPurifierConfig),
 #if false
                nameof(WaterCoolerConfig),
                nameof(JuicerConfig),
@@ -34,17 +39,13 @@ namespace DeliveryTemperatureLimit
                nameof(EspressoMachineConfig),
                nameof(OuthouseConfig),
                nameof(SodaFountainConfig),
-               nameof(PlanterBoxConfig),
                nameof(CompostConfig),
-               nameof(AirFilterConfig),
                nameof(AlgaeDistilleryConfig),
-               nameof(WaterPurifierConfig),
                nameof(OxyliteRefineryConfig),
                nameof(MineralDeoxidizerConfig),
                nameof(HandSanitizerConfig),
                nameof(FertilizerMakerConfig),
                nameof(DiningTableConfig),
-               nameof(CreatureFeederConfig),
 #endif
             };
             foreach( string config in configs )
