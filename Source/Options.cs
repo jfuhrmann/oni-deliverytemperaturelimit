@@ -30,7 +30,7 @@ namespace DeliveryTemperatureLimit
             MaxConstructionTemperature = GameUtil.GetTemperatureConvertedFromKelvin(
                 45 + 273.15f, GameUtil.temperatureUnit );
             MinConstructionTemperature = GameUtil.GetTemperatureConvertedFromKelvin(
-                -30 + 273.15f, GameUtil.temperatureUnit );
+                -50 + 273.15f, GameUtil.temperatureUnit );
             MaxSmallConstructionTemperature = GameUtil.GetTemperatureConvertedFromKelvin(
                 95 + 273.15f, GameUtil.temperatureUnit );
         }
