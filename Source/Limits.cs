@@ -17,9 +17,9 @@ namespace DeliveryTemperatureLimit
         [SerializeField]
         private int highLimit = 0; // if 0, then not active
 
-        public int MinValue => 0;
+        public const int MinValue = 0;
 
-        public int MaxValue => 5000; // diamond melts at ~4200K
+        public const int MaxValue = 5000; // diamond melts at ~4200K
 
         public bool IsDisabled() => ( highLimit == 0 );
         public int LowLimit => lowLimit;
@@ -44,22 +44,26 @@ namespace DeliveryTemperatureLimit
             {
                 lowLimit = component.lowLimit;
                 highLimit = component.highLimit;
+                SetDirty();
             }
         }
 
         public void SetLowLimit(int value)
         {
             lowLimit = Math.Max( value, MinValue );
+            SetDirty();
         }
 
         public void SetHighLimit(int value)
         {
             highLimit = Math.Min( value, MaxValue );
+            SetDirty();
         }
 
         public void Disable()
         {
             highLimit = 0;
+            SetDirty();
         }
 
         public bool AllowedByTemperature( float temperature )
@@ -82,6 +86,88 @@ namespace DeliveryTemperatureLimit
                     highLimit = oldLimit.HighLimit;
                 }
             }
+            allLimits.Add( this );
+            SetDirty();
+        }
+
+        protected override void OnCleanUp()
+        {
+            allLimits.Remove( this );
+            SetDirty();
+            base.OnCleanUp();
+        }
+
+        // Some game code groups resources by their tag (material) and then processes
+        // such groups as a whole. That wouldn't work with temperature limits, as resources
+        // with different temperatures may need different handling. But grouping by each
+        // existing temperature would be expensive, and some of this code is called very
+        // often, so instead only group them by existing limits: For example if there
+        // is storage #1 with limit 10C-30C and storage #2 with limit 20C-30C, then it's
+        // enough to group by min-10C, 10C-20C, 20C-30C and 30C-max, as e.g. 15C is different
+        // from 25C (accepted vs not accepted by #2), but 21C vs 29C doesn't matter. For that
+        // reason this code collects all such groups and gives them integer indexes,
+        // which is then easier and faster to handle.
+        // Additional complication is that some of the relevant game code is run in threads,
+        // so this needs to be thread-safe. This is handled by the hot code being lockless
+        // if possible, only checking one volatile atomic flag and then accessing pre-built data.
+        // If something changes, the flag is set, and then the data is rebuilt with a lock
+        // held. Race conditions in the lockless code don't matter, the code is called repeatedly
+        // (temperatures change over time), so if it works with data that is out of date,
+        // it'll be updated again later.
+        private static object lockObject = new object();
+        private static List< TemperatureLimit > allLimits = new List< TemperatureLimit >();
+        private volatile static bool limitsDirty = true;
+        // A list of temperature values where groups end/start (in the example above, this would
+        // be { min, 10, 20, 30, max }.
+        private static List< int > indexTemperatures;
+
+        private static void SetDirty()
+        {
+            lock( lockObject )
+            {
+                limitsDirty = true;
+            }
+        }
+
+        private static void UpdateIndexes()
+        {
+            lock( lockObject )
+            {
+                if( !limitsDirty )
+                    return;
+                List< int > tmp = new List< int >();
+                tmp.Add( TemperatureLimit.MinValue );
+                tmp.Add( TemperatureLimit.MaxValue );
+                foreach( TemperatureLimit limit in allLimits )
+                {
+                    if( !limit.IsDisabled())
+                    {
+                        tmp.Add( limit.LowLimit );
+                        tmp.Add( limit.HighLimit );
+                    }
+                }
+                tmp.Sort();
+                tmp = tmp.Distinct().ToList();
+                if( !tmp.Equals( indexTemperatures ))
+                    Interlocked.Exchange( ref indexTemperatures, tmp );
+                limitsDirty = false;
+            }
+        }
+
+        public static int TemperatureIndex( float temperature )
+        {
+            if( limitsDirty )
+                UpdateIndexes();
+            // Refcount the data, so that another thread changing it does not affect this.
+            // Being a bit out of date is not a problem, this will be run again somewhen.
+            List< int > temperatures = indexTemperatures;
+            // TODO binary search?
+            for( int i = 0; i < temperatures.Count; ++i )
+            {
+                if( temperature < temperatures[ i ] )
+                    return i - 1;
+            }
+            return -1;
         }
     }
 

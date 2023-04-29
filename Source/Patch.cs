@@ -346,4 +346,117 @@ namespace DeliveryTemperatureLimit
             }
         }
     }
+
+    // FetchManager keeps a list of available Pickupable's, and (for presumably performance reasons)
+    // it sorts them by tag+priority+cost, and then keeps only the cheapest one for each tag+priority.
+    // This needs to be changed to keep one for each tag+priority+temperatureindex, otherwise
+    // the game wouldn't find a further pickupable with suitable temperature if there would be
+    // a closer one with an unsuitable temperature.
+    [HarmonyPatch(typeof(FetchManager.FetchablesByPrefabId))]
+    public class FetchManager_FetchablesByPrefabId_Patch
+    {
+        [HarmonyTranspiler]
+        [HarmonyPatch(nameof(UpdatePickups))]
+        public static IEnumerable<CodeInstruction> UpdatePickups(IEnumerable<CodeInstruction> instructions)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+            bool found1 = false;
+            bool found2 = false;
+            int pickupLoad = -1;
+            int pickup2Load = -1;
+            for( int i = 0; i < codes.Count; ++i )
+            {
+//                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                // The function has code:
+                // finalPickups.Sort(ComparerIncludingPriority);
+                // Replace with:
+                // finalPickups.Sort(FetchManager_FetchablesByPrefabId_Patch.ComparerIncludingPriority);
+                if( codes[ i ].opcode == OpCodes.Ldsfld
+                    && codes[ i ].operand.ToString() == "FetchManager+PickupComparerIncludingPriority ComparerIncludingPriority" )
+                {
+                    codes[ i ] = CodeInstruction.LoadField( typeof( FetchManager_FetchablesByPrefabId_Patch ),
+                        nameof( ComparerIncludingPriority ));
+                    found1 = true;
+                }
+                if( i > 0 && codes[ i ].opcode == OpCodes.Ldfld && codes[ i ].operand.ToString() == "System.Int32 tagBitsHash" )
+                {
+                    if( pickupLoad < 0 )
+                        pickupLoad = i - 1;
+                    else
+                        pickup2Load = i - 1;
+                }
+                // The function has code:
+                // if (pickup.masterPriority == pickup2.masterPriority && tagBitsHash == num)
+                // Change to:
+                // if (.. && tagBitsHash == num
+                //     && TemperatureLimit.TemperatureIndex( pickup.pickupable.PrimaryElement.Temperature )
+                //         == TemperatureLimit.TemperatureIndex( pickup2.pickupable.PrimaryElement.Temperature ))
+                if( codes[ i ].opcode == OpCodes.Ldfld && codes[ i ].operand.ToString() == "System.Int32 masterPriority"
+                    && i + 4 < codes.Count && pickupLoad != -1 && pickup2Load != -1
+                    && codes[ i + 1 ].opcode == OpCodes.Bne_Un_S
+                    && codes[ i + 2 ].opcode == OpCodes.Ldloc_S
+                    && CodeInstructionExtensions.IsLdloc( codes[ i + 3 ] )
+                    && codes[ i + 4 ].opcode == OpCodes.Bne_Un_S )
+                {
+                    MethodInfo primaryElement
+                        = AccessTools.Property( typeof( Pickupable ), nameof( Pickupable.PrimaryElement )).GetGetMethod();
+                    MethodInfo temperature
+                        = AccessTools.Property( typeof( PrimaryElement ), nameof( PrimaryElement.Temperature )).GetGetMethod();
+                    codes.Insert( i + 5, codes[ pickupLoad ].Clone()); // load 'pickup'
+                    codes.Insert( i + 6, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
+                        nameof( FetchManager.Pickup.pickupable ))); // load 'pickup.pickupable'
+                    // get 'pickup.pickupable.PrimaryElement'
+                    codes.Insert( i + 7, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
+                    // get 'pickup.pickupable.PrimaryElement.Temperature'
+                    codes.Insert( i + 8, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
+                    codes.Insert( i + 9, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
+                        new Type[] { typeof( float ) } ));
+
+                    codes.Insert( i + 10, codes[ pickup2Load ].Clone()); // load 'pickup2'
+                    codes.Insert( i + 11, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
+                        nameof( FetchManager.Pickup.pickupable ))); // load 'pickup2.pickupable'
+                    // get 'pickup2.pickupable.PrimaryElement'
+                    codes.Insert( i + 12, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
+                    // get 'pickup2.pickupable.PrimaryElement.Temperature'
+                    codes.Insert( i + 13, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
+                    codes.Insert( i + 14, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
+                        new Type[] { typeof( float ) } ));
+
+                    codes.Insert( i + 15, codes[ i + 4 ].Clone());
+                    found2 = true;
+                }
+            }
+            if(!found1 || !found2)
+                Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FetchManager.FetchablesByPrefabId.UpdatePickups()");
+            return codes;
+        }
+
+        public class PickupComparerIncludingPriority : IComparer<FetchManager.Pickup>
+        {
+            public int Compare(FetchManager.Pickup a, FetchManager.Pickup b)
+            {
+                int num = a.tagBitsHash.CompareTo(b.tagBitsHash);
+                if (num != 0)
+                    return num;
+                num = b.masterPriority.CompareTo(a.masterPriority);
+                if (num != 0)
+                    return num;
+                // Added.
+                num = TemperatureLimit.TemperatureIndex( b.pickupable.PrimaryElement.Temperature )
+                    .CompareTo( TemperatureLimit.TemperatureIndex( a.pickupable.PrimaryElement.Temperature ));
+                if (num != 0)
+                    return num;
+                // End added.
+                num = a.PathCost.CompareTo(b.PathCost);
+                if (num != 0)
+                    return num;
+                num = b.foodQuality.CompareTo(a.foodQuality);
+                if (num != 0)
+                    return num;
+                return b.freshness.CompareTo(a.freshness);
+            }
+        }
+
+        public static readonly PickupComparerIncludingPriority ComparerIncludingPriority = new PickupComparerIncludingPriority();
+    }
 }

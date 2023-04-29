@@ -110,8 +110,8 @@ namespace DeliveryTemperatureLimit
         private void OnTextChangedLow(GameObject source, string text)
         {
             if( target.IsDisabled())
-                SetHighValue( target.MaxValue ); // fill in a value in the other one
-            int value = OnTextChanged( text, (int v) => SetLowValue( v ), target.MinValue );
+                SetHighValue( TemperatureLimit.MaxValue ); // fill in a value in the other one
+            int value = OnTextChanged( text, (int v) => SetLowValue( v ), TemperatureLimit.MinValue );
             if( value != -1 && value > target.HighLimit )
                 SetHighValue( value );
             UpdateToolTip();
@@ -120,8 +120,8 @@ namespace DeliveryTemperatureLimit
         private void OnTextChangedHigh(GameObject source, string text)
         {
             if( target.IsDisabled())
-                SetLowValue( target.MinValue ); // fill in a value in the other one
-            int value = OnTextChanged( text, (int v) => SetHighValue( v ), target.MaxValue );
+                SetLowValue( TemperatureLimit.MinValue ); // fill in a value in the other one
+            int value = OnTextChanged( text, (int v) => SetHighValue( v ), TemperatureLimit.MaxValue );
             if( value != -1 && value < target.LowLimit )
                 SetLowValue( value );
             UpdateToolTip();
