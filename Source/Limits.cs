@@ -117,9 +117,13 @@ namespace DeliveryTemperatureLimit
         private static object lockObject = new object();
         private static List< TemperatureLimit > allLimits = new List< TemperatureLimit >();
         private volatile static bool limitsDirty = true;
-        // A list of temperature values where groups end/start (in the example above, this would
-        // be { min, 10, 20, 30, max }.
+        // A list of temperature values where groups end (in the example above, this would
+        // be { 10, 20, 30, max }.
         private static List< int > indexTemperatures;
+        // The inverse of indexTemperatures. There are only 5000 (MinValue <= t < MaxValue) integer
+        // temperatures, and TemperatureIndex() seems to be called for hot code, so replace
+        // lookup in a loop with O(1) indexing.
+        private static System.Int16[] temperaturesToIndex;
 
         private static void SetDirty()
         {
@@ -136,7 +140,6 @@ namespace DeliveryTemperatureLimit
                 if( !limitsDirty )
                     return;
                 List< int > tmp = new List< int >();
-                tmp.Add( TemperatureLimit.MinValue );
                 tmp.Add( TemperatureLimit.MaxValue );
                 foreach( TemperatureLimit limit in allLimits )
                 {
@@ -149,7 +152,18 @@ namespace DeliveryTemperatureLimit
                 tmp.Sort();
                 tmp = tmp.Distinct().ToList();
                 if( !tmp.Equals( indexTemperatures ))
-                    Interlocked.Exchange( ref indexTemperatures, tmp );
+                {
+                    indexTemperatures = tmp;
+                    System.Int16[] newTemperaturesToIndex = new System.Int16[ MaxValue - MinValue ];
+                    int pos = 0;
+                    for( System.Int16 i = 0; i < indexTemperatures.Count; ++i )
+                    {
+                        int value = indexTemperatures[ i ];
+                        while( pos < value )
+                            newTemperaturesToIndex[ pos++ ] = i;
+                    }
+                    Interlocked.Exchange( ref temperaturesToIndex, newTemperaturesToIndex );
+                }
                 limitsDirty = false;
             }
         }
@@ -158,15 +172,8 @@ namespace DeliveryTemperatureLimit
         {
             if( limitsDirty )
                 UpdateIndexes();
-            // Refcount the data, so that another thread changing it does not affect this.
-            // Being a bit out of date is not a problem, this will be run again somewhen.
-            List< int > temperatures = indexTemperatures;
-            // TODO binary search?
-            for( int i = 0; i < temperatures.Count; ++i )
-            {
-                if( temperature < temperatures[ i ] )
-                    return i - 1;
-            }
+            if( temperature >= MinValue && temperature < MaxValue )
+                return temperaturesToIndex[ (int) temperature ];
             return -1;
         }
     }
