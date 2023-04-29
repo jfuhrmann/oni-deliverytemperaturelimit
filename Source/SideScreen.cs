@@ -8,13 +8,13 @@ using STRINGS;
 
 namespace DeliveryTemperatureLimit
 {
-    public class TemperatureLimitsSideScreen : SideScreenContent
+    public class TemperatureLimitSideScreen : SideScreenContent
     {
         private GameObject lowInput;
 
         private GameObject highInput;
 
-        private TemperatureLimits target;
+        private TemperatureLimit target;
 
         protected override void OnPrefabInit()
         {
@@ -35,14 +35,14 @@ namespace DeliveryTemperatureLimit
             };
             PTextField lowInputField = new PTextField( "lowLimit" )
             {
-                    Type = PTextField.FieldType.Float,
+                    Type = PTextField.FieldType.Integer,
                     OnTextChanged = OnTextChangedLow,
             };
             lowInputField.SetMinWidthInCharacters(6);
             lowInputField.AddOnRealize((obj) => lowInput = obj);
             PTextField highInputField = new PTextField( "highLimit" )
             {
-                Type = PTextField.FieldType.Float,
+                Type = PTextField.FieldType.Integer,
                 OnTextChanged = OnTextChangedHigh,
             };
             highInputField.SetMinWidthInCharacters(6);
@@ -50,12 +50,12 @@ namespace DeliveryTemperatureLimit
             PLabel label = new PLabel( "label" )
             {
                 TextStyle = PUITuning.Fonts.TextDarkStyle,
-                Text = STRINGS.TEMPERATURELIMITS.LABEL
+                Text = STRINGS.TEMPERATURELIMIT.LABEL
             };
             PLabel separator = new PLabel( "separator" )
             {
                 TextStyle = PUITuning.Fonts.TextDarkStyle,
-                Text = STRINGS.TEMPERATURELIMITS.RANGE_SEPARATOR
+                Text = STRINGS.TEMPERATURELIMIT.RANGE_SEPARATOR
             };
             panel.AddChild( label );
             panel.AddChild( lowInputField );
@@ -74,7 +74,7 @@ namespace DeliveryTemperatureLimit
 
         public override bool IsValidForTarget(GameObject target)
         {
-            return target.GetComponent<TemperatureLimits>() != null;
+            return target.GetComponent<TemperatureLimit>() != null;
         }
 
         public override void SetTarget(GameObject new_target)
@@ -84,10 +84,10 @@ namespace DeliveryTemperatureLimit
                 Debug.LogError("Invalid gameObject received");
                 return;
             }
-            target = new_target.GetComponent<TemperatureLimits>();
+            target = new_target.GetComponent<TemperatureLimit>();
             if (target == null)
             {
-                Debug.LogError("The gameObject received does not contain a TemperatureLimits component");
+                Debug.LogError("The gameObject received does not contain a TemperatureLimit component");
                 return;
             }
             UpdateInputs();
@@ -111,7 +111,7 @@ namespace DeliveryTemperatureLimit
         {
             if( target.IsDisabled())
                 SetHighValue( target.MaxValue ); // fill in a value in the other one
-            float value = OnTextChanged( text, (float v) => SetLowValue( v ), target.MinValue );
+            int value = OnTextChanged( text, (int v) => SetLowValue( v ), target.MinValue );
             if( value != -1 && value > target.HighLimit )
                 SetHighValue( value );
             UpdateToolTip();
@@ -121,13 +121,13 @@ namespace DeliveryTemperatureLimit
         {
             if( target.IsDisabled())
                 SetLowValue( target.MinValue ); // fill in a value in the other one
-            float value = OnTextChanged( text, (float v) => SetHighValue( v ), target.MaxValue );
+            int value = OnTextChanged( text, (int v) => SetHighValue( v ), target.MaxValue );
             if( value != -1 && value < target.LowLimit )
                 SetLowValue( value );
             UpdateToolTip();
         }
 
-        private float OnTextChanged( string text, Action< float > setValueFunc, float fallback )
+        private int OnTextChanged( string text, Action< int > setValueFunc, int fallback )
         {
             text = text.Trim();
             if( string.IsNullOrEmpty( text ))
@@ -140,37 +140,37 @@ namespace DeliveryTemperatureLimit
             // so strip it if it's there
             if( text.EndsWith( GameUtil.GetTemperatureUnitSuffix()))
                 text = text.Remove( text.Length - GameUtil.GetTemperatureUnitSuffix().Length );
-            float result;
-            if(float.TryParse(text, out result))
-                result = GameUtil.GetTemperatureConvertedToKelvin(result);
+            int result;
+            if(int.TryParse(text, out result))
+                result = (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(result));
             else
                 result = fallback;
             setValueFunc( result );
             return result;
         }
 
-        private void SetLowValue( float value )
+        private void SetLowValue( int value )
         {
             SetValue( value, lowInput,
-                (float v) => target.SetLowLimit( v ),
+                (int v) => target.SetLowLimit( v ),
                 () => target.LowLimit );
         }
 
-        private void SetHighValue( float value )
+        private void SetHighValue( int value )
         {
             SetValue( value, highInput,
-                (float v) => target.SetHighLimit( v ),
+                (int v) => target.SetHighLimit( v ),
                 () => target.HighLimit );
         }
 
-        private void SetValue( float value, GameObject input, Action< float > setTargetFunc,
-            Func< float > targetValueFunc )
+        private void SetValue( int value, GameObject input, Action< int > setTargetFunc,
+            Func< int > targetValueFunc )
         {
             setTargetFunc( value );
             value = targetValueFunc(); // maybe clamped, so re-read
             TMP_InputField field = input.GetComponent< TMP_InputField >();
             string text = GameUtil.GetFormattedTemperature(value, GameUtil.TimeSlice.None,
-                GameUtil.TemperatureInterpretation.Absolute, true);
+                GameUtil.TemperatureInterpretation.Absolute, true, true);
             if( field.text != text )
                 field.text = text;
         }
@@ -190,20 +190,20 @@ namespace DeliveryTemperatureLimit
         {
             string tooltip;
             if( !target.IsDisabled())
-                tooltip  = string.Format(STRINGS.TEMPERATURELIMITS.TOOLTIP_RANGE,
+                tooltip  = string.Format(STRINGS.TEMPERATURELIMIT.TOOLTIP_RANGE,
                     GameUtil.GetFormattedTemperature(target.LowLimit, GameUtil.TimeSlice.None,
-                        GameUtil.TemperatureInterpretation.Absolute, true),
+                        GameUtil.TemperatureInterpretation.Absolute, true, true),
                     GameUtil.GetFormattedTemperature(target.HighLimit, GameUtil.TimeSlice.None,
-                        GameUtil.TemperatureInterpretation.Absolute, true));
+                        GameUtil.TemperatureInterpretation.Absolute, true, true));
             else
-                tooltip = STRINGS.TEMPERATURELIMITS.TOOLTIP_NOTSET;
+                tooltip = STRINGS.TEMPERATURELIMIT.TOOLTIP_NOTSET;
             PUIElements.SetToolTip( lowInput, tooltip );
             PUIElements.SetToolTip( highInput, tooltip );
         }
 
         public override string GetTitle()
         {
-            return STRINGS.TEMPERATURELIMITS.SIDESCREEN_TITLE;
+            return STRINGS.TEMPERATURELIMIT.SIDESCREEN_TITLE;
         }
     }
 
@@ -213,7 +213,7 @@ namespace DeliveryTemperatureLimit
     {
         public static void Postfix()
         {
-            PUIUtils.AddSideScreenContent<TemperatureLimitsSideScreen>();
+            PUIUtils.AddSideScreenContent<TemperatureLimitSideScreen>();
         }
     }
 }

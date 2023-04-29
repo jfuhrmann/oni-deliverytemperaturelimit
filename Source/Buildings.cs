@@ -60,7 +60,8 @@ namespace DeliveryTemperatureLimit
 
         public static void DoPostConfigureComplete(GameObject go)
         {
-            go.AddOrGet<TemperatureLimits>();
+            go.AddOrGet<TemperatureLimit>();
+            go.AddOrGet<TemperatureLimits>(); // TODO backwards compatibility
         }
     }
 }

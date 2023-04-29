@@ -1,5 +1,6 @@
 using PeterHan.PLib.Options;
 using Newtonsoft.Json;
+using System;
 
 namespace DeliveryTemperatureLimit
 {
@@ -15,25 +16,25 @@ namespace DeliveryTemperatureLimit
 
         [Option("Max Construction Temperature", "Maximum temperature of resources for building a building.")]
         [JsonProperty]
-        public float MaxConstructionTemperature { get; set; }
+        public int MaxConstructionTemperature { get; set; }
 
         [Option("Min Construction Temperature", "Minimum temperature of resources for building a building.")]
         [JsonProperty]
-        public float MinConstructionTemperature { get; set; }
+        public int MinConstructionTemperature { get; set; }
 
         [Option("Max Small Construction Temperature", "Maximum temperature of resources for building a small building (25kg max).")]
         [JsonProperty]
-        public float MaxSmallConstructionTemperature { get; set; }
+        public int MaxSmallConstructionTemperature { get; set; }
 
         public Options()
         {
             UnderConstructionLimit = false;
-            MaxConstructionTemperature = GameUtil.GetTemperatureConvertedFromKelvin(
-                45 + 273.15f, GameUtil.temperatureUnit );
-            MinConstructionTemperature = GameUtil.GetTemperatureConvertedFromKelvin(
-                -50 + 273.15f, GameUtil.temperatureUnit );
-            MaxSmallConstructionTemperature = GameUtil.GetTemperatureConvertedFromKelvin(
-                95 + 273.15f, GameUtil.temperatureUnit );
+            MaxConstructionTemperature = (int) Math.Round( GameUtil.GetTemperatureConvertedFromKelvin(
+                45 + 273.15f, GameUtil.temperatureUnit ));
+            MinConstructionTemperature = (int) Math.Round( GameUtil.GetTemperatureConvertedFromKelvin(
+                -50 + 273.15f, GameUtil.temperatureUnit ));
+            MaxSmallConstructionTemperature = (int) Math.Round( GameUtil.GetTemperatureConvertedFromKelvin(
+                95 + 273.15f, GameUtil.temperatureUnit ));
         }
 
         public override string ToString()

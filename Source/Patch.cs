@@ -17,10 +17,10 @@ namespace DeliveryTemperatureLimit
         {
             if( !__result )
                 return;
-            TemperatureLimits limits = destination.GetComponent< TemperatureLimits >();
-            if( limits == null || limits.IsDisabled())
+            TemperatureLimit limit = destination.GetComponent< TemperatureLimit >();
+            if( limit == null || limit.IsDisabled())
                 return;
-            __result = limits.AllowedByTemperature( pickup.PrimaryElement.Temperature );
+            __result = limit.AllowedByTemperature( pickup.PrimaryElement.Temperature );
         }
     }
 
@@ -86,11 +86,11 @@ namespace DeliveryTemperatureLimit
 
         public static bool CollectChores_Hook( FetchChore chore, Pickupable pickupable )
         {
-            TemperatureLimits limits = chore.destination?.GetComponent< TemperatureLimits >();
-            if( limits == null || limits.IsDisabled())
+            TemperatureLimit limit = chore.destination?.GetComponent< TemperatureLimit >();
+            if( limit == null || limit.IsDisabled())
                 return true;
             if( pickupable?.PrimaryElement != null )
-                return limits.AllowedByTemperature( pickupable.PrimaryElement.Temperature );
+                return limit.AllowedByTemperature( pickupable.PrimaryElement.Temperature );
             return true;
         }
     }
@@ -161,19 +161,19 @@ namespace DeliveryTemperatureLimit
 
         public static bool Begin_Hook1( FetchChore rootChore, Pickupable pickupable2 )
         {
-            TemperatureLimits limits = rootChore.destination?.GetComponent< TemperatureLimits >();
-            if( limits == null || limits.IsDisabled())
+            TemperatureLimit limit = rootChore.destination?.GetComponent< TemperatureLimit >();
+            if( limit == null || limit.IsDisabled())
                 return true;
-            return limits.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
+            return limit.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
         }
 
         public static bool Begin_Hook2( FetchChore rootChore, FetchChore fetchChore2 )
         {
-            TemperatureLimits limits = rootChore?.destination?.GetComponent< TemperatureLimits >();
+            TemperatureLimit limit = rootChore?.destination?.GetComponent< TemperatureLimit >();
             Pickupable pickupable2 = fetchChore2?.fetchTarget;
-            if( limits == null || limits.IsDisabled() || pickupable2 == null )
+            if( limit == null || limit.IsDisabled() || pickupable2 == null )
                 return true;
-            return limits.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
+            return limit.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
         }
     }
 
@@ -184,7 +184,7 @@ namespace DeliveryTemperatureLimit
         private class TagData
         {
             // Low/high limit. If not set (null), there's no limit.
-            public List< ValueTuple< float, float >> limits;
+            public List< ValueTuple< int, int >> limits;
         }
         // Stored for each GlobalChoreProvider.
         private class PerProviderData
@@ -216,10 +216,10 @@ namespace DeliveryTemperatureLimit
                 return;
             if( pickupable.PrimaryElement == null )
                 return;
-            float temperature = pickupable.PrimaryElement.Temperature;
-            foreach( ValueTuple< float, float > limit in tagData.limits )
+            int temperature = (int)pickupable.PrimaryElement.Temperature;
+            foreach( ValueTuple< int, int > limit in tagData.limits )
             {
-                if( limit.Item1 <= temperature && temperature <= limit.Item2 )
+                if( limit.Item1 <= temperature && temperature < limit.Item2 )
                     return; // ok, found a valid range
             }
             __result = false; // no storage that'd allow the temperature
@@ -278,8 +278,8 @@ namespace DeliveryTemperatureLimit
 
         public static void UpdateStorageFetchableBits_Hook2(FetchChore chore)
         {
-            TemperatureLimits limits = chore.destination.GetComponent< TemperatureLimits >();
-            if( limits == null || limits.IsDisabled())
+            TemperatureLimit limit = chore.destination.GetComponent< TemperatureLimit >();
+            if( limit == null || limit.IsDisabled())
             {
                 foreach( Tag tag in chore.tags )
                 {
@@ -301,22 +301,22 @@ namespace DeliveryTemperatureLimit
                 {
                     tagData = new TagData();
                     // We will be adding a limit, so set up the list (which means not all are allowed).
-                    tagData.limits = new List< ValueTuple< float, float >>();
+                    tagData.limits = new List< ValueTuple< int, int >>();
                     currentProvider.tagData[ tag ] = tagData;
                 }
                 if( tagData.limits == null ) // All allowed.
                     continue;
                 bool found = false;
-                foreach( ValueTuple< float, float > limitItem in tagData.limits )
+                foreach( ValueTuple< int, int > limitItem in tagData.limits )
                 {
-                    if( limitItem.Item1 <= limits.LowLimit && limits.HighLimit <= limitItem.Item2 )
+                    if( limitItem.Item1 <= limit.LowLimit && limit.HighLimit < limitItem.Item2 )
                     {
                         found = true;
                         break; // ok, included in another range
                     }
                 }
                 if( !found )
-                    tagData.limits.Add( ValueTuple.Create( limits.LowLimit, limits.HighLimit ));
+                    tagData.limits.Add( ValueTuple.Create( limit.LowLimit, limit.HighLimit ));
             }
         }
     }
@@ -331,18 +331,18 @@ namespace DeliveryTemperatureLimit
             Options options = POptions.ReadSettings< Options >();
             if( options != null && options.UnderConstructionLimit )
             {
-                TemperatureLimits limits = __result.AddOrGet<TemperatureLimits>();
-                limits.SetLowLimit( GameUtil.GetTemperatureConvertedToKelvin(
-                    options.MinConstructionTemperature, GameUtil.temperatureUnit ));
+                TemperatureLimit limit = __result.AddOrGet<TemperatureLimit>();
+                limit.SetLowLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
+                    options.MinConstructionTemperature, GameUtil.temperatureUnit )));
                 float totalMass = 0;
                 foreach( float mass in def.Mass )
                     totalMass += mass;
                 if( totalMass > 25 )
-                    limits.SetHighLimit( GameUtil.GetTemperatureConvertedToKelvin(
-                        options.MaxConstructionTemperature, GameUtil.temperatureUnit ));
+                    limit.SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
+                        options.MaxConstructionTemperature, GameUtil.temperatureUnit )));
                 else
-                    limits.SetHighLimit( GameUtil.GetTemperatureConvertedToKelvin(
-                        options.MaxSmallConstructionTemperature, GameUtil.temperatureUnit ));
+                    limit.SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
+                        options.MaxSmallConstructionTemperature, GameUtil.temperatureUnit )));
             }
         }
     }

@@ -1,24 +1,32 @@
 using KSerialization;
 using UnityEngine;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 
 namespace DeliveryTemperatureLimit
 {
-    public class TemperatureLimits : KMonoBehaviour
+    public class TemperatureLimit : KMonoBehaviour
     {
         [Serialize]
         [SerializeField] // needed so that making copies of an instance copies the private field too
-        private float lowLimit = 0; // 0 Kelvin
+        private int lowLimit = 0; // 0 Kelvin
 
         [Serialize]
         [SerializeField]
-        private float highLimit = 0; // if 0, then not active
+        private int highLimit = 0; // if 0, then not active
 
-        public float MinValue => 0f;
+        public int MinValue => 0;
 
-        public float MaxValue => 5000f; // diamond melts at ~4200K
+        public int MaxValue => 5000; // diamond melts at ~4200K
 
-        private static readonly EventSystem.IntraObjectHandler<TemperatureLimits> OnCopySettingsDelegate
-            = new EventSystem.IntraObjectHandler<TemperatureLimits>(delegate(TemperatureLimits component, object data)
+        public bool IsDisabled() => ( highLimit == 0 );
+        public int LowLimit => lowLimit;
+        public int HighLimit => highLimit;
+
+        private static readonly EventSystem.IntraObjectHandler<TemperatureLimit> OnCopySettingsDelegate
+            = new EventSystem.IntraObjectHandler<TemperatureLimit>(delegate(TemperatureLimit component, object data)
         {
             component.OnCopySettings(data);
         });
@@ -31,7 +39,7 @@ namespace DeliveryTemperatureLimit
 
         private void OnCopySettings(object data)
         {
-            TemperatureLimits component = ((GameObject)data).GetComponent<TemperatureLimits>();
+            TemperatureLimit component = ((GameObject)data).GetComponent<TemperatureLimit>();
             if (component != null)
             {
                 lowLimit = component.lowLimit;
@@ -39,18 +47,14 @@ namespace DeliveryTemperatureLimit
             }
         }
 
-        public bool IsDisabled() => ( highLimit == 0 );
-        public float LowLimit => lowLimit;
-        public float HighLimit => highLimit;
-
-        public void SetLowLimit(float value)
+        public void SetLowLimit(int value)
         {
-            lowLimit = Mathf.Max( value, MinValue );
+            lowLimit = Math.Max( value, MinValue );
         }
 
-        public void SetHighLimit(float value)
+        public void SetHighLimit(int value)
         {
-            highLimit = Mathf.Min( value, MaxValue );
+            highLimit = Math.Min( value, MaxValue );
         }
 
         public void Disable()
@@ -62,7 +66,39 @@ namespace DeliveryTemperatureLimit
         {
             if( highLimit == 0 ) // limit disabled
                 return true;
-            return lowLimit <= temperature && temperature <= highLimit;
+            int t = (int) temperature;
+            return lowLimit <= t && t < highLimit;
         }
+
+        protected override void OnSpawn()
+        {
+            base.OnSpawn();
+            if( highLimit == 0 )
+            {
+                TemperatureLimits oldLimit = GetComponent< TemperatureLimits >();
+                if( oldLimit != null && !oldLimit.IsDisabled())
+                {
+                    lowLimit = oldLimit.LowLimit;
+                    highLimit = oldLimit.HighLimit;
+                }
+            }
+        }
+    }
+
+    // Backwards compatibility.
+    // TODO: remove?
+    public class TemperatureLimits : KMonoBehaviour
+    {
+        [Serialize]
+        [SerializeField]
+        private float lowLimit = 0;
+
+        [Serialize]
+        [SerializeField]
+        private float highLimit = 0;
+
+        public bool IsDisabled() => ( highLimit == 0 );
+        public int LowLimit => (int)lowLimit;
+        public int HighLimit => (int)highLimit;
     }
 }
