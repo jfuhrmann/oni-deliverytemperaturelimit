@@ -5,6 +5,7 @@ namespace DeliveryTemperatureLimit
 {
     [JsonObject(MemberSerialization.OptIn)]
     [ModInfo("https://github.com/llunak/oni-deliverytemperaturelimit")]
+    [ConfigFile(SharedConfigLocation: true)]
     [RestartRequired]  // BuildingDef instances are created on game load
     public sealed class Options
     {
