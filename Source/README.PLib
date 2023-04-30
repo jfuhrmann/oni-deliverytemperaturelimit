@@ -1,5 +1,5 @@
 A copy of part of PLib from https://github.com/peterhaneve/ONIMods is included.
-Source revision : a25d1e4e19935b80812d37aef370320769a0c32f
+Source revision : 69b21a752e6175a9e279a232a8ecf829630b3b99
 
 PLib docs suggest to use ILMerge, but I have no idea how to use it on Linux,
 and also the repo is now read-only, so possibly obsolete. Copying the libs
