@@ -84,6 +84,7 @@ namespace DeliveryTemperatureLimit
                 {
                     lowLimit = oldLimit.LowLimit;
                     highLimit = oldLimit.HighLimit;
+                    oldLimit.Reset();
                 }
             }
             allLimits.Add( this );
@@ -193,5 +194,10 @@ namespace DeliveryTemperatureLimit
         public bool IsDisabled() => ( highLimit == 0 );
         public int LowLimit => (int)lowLimit;
         public int HighLimit => (int)highLimit;
+        public void Reset()
+        {
+            lowLimit = 0;
+            highLimit = 0;
+        }
     }
 }
