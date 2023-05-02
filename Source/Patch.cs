@@ -360,24 +360,12 @@ namespace DeliveryTemperatureLimit
         public static IEnumerable<CodeInstruction> UpdatePickups(IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
-            bool found1 = false;
-            bool found2 = false;
+            bool found = false;
             int pickupLoad = -1;
             int pickup2Load = -1;
             for( int i = 0; i < codes.Count; ++i )
             {
 //                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
-                // The function has code:
-                // finalPickups.Sort(ComparerIncludingPriority);
-                // Replace with:
-                // finalPickups.Sort(FetchManager_FetchablesByPrefabId_Patch.ComparerIncludingPriority);
-                if( codes[ i ].opcode == OpCodes.Ldsfld
-                    && codes[ i ].operand.ToString() == "FetchManager+PickupComparerIncludingPriority ComparerIncludingPriority" )
-                {
-                    codes[ i ] = CodeInstruction.LoadField( typeof( FetchManager_FetchablesByPrefabId_Patch ),
-                        nameof( ComparerIncludingPriority ));
-                    found1 = true;
-                }
                 if( i > 0 && codes[ i ].opcode == OpCodes.Ldfld && codes[ i ].operand.ToString() == "System.Int32 tagBitsHash" )
                 {
                     if( pickupLoad < 0 )
@@ -422,41 +410,150 @@ namespace DeliveryTemperatureLimit
                     codes.Insert( i + 14, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
                         new Type[] { typeof( float ) } ));
 
-                    codes.Insert( i + 15, codes[ i + 4 ].Clone());
-                    found2 = true;
+                    codes.Insert( i + 15, codes[ i + 4 ].Clone()); // if not equal
+                    found = true;
                 }
             }
-            if(!found1 || !found2)
+            if(!found)
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FetchManager.FetchablesByPrefabId.UpdatePickups()");
             return codes;
         }
+    }
 
-        public class PickupComparerIncludingPriority : IComparer<FetchManager.Pickup>
+    public class FetchManager_PickupComparerIncludingPriority_Patch
+    {
+        // The class is private, so patch manually.
+        public static void Patch( Harmony harmony )
         {
-            public int Compare(FetchManager.Pickup a, FetchManager.Pickup b)
-            {
-                int num = a.tagBitsHash.CompareTo(b.tagBitsHash);
-                if (num != 0)
-                    return num;
-                num = b.masterPriority.CompareTo(a.masterPriority);
-                if (num != 0)
-                    return num;
-                // Added.
-                num = TemperatureLimit.TemperatureIndex( b.pickupable.PrimaryElement.Temperature )
-                    .CompareTo( TemperatureLimit.TemperatureIndex( a.pickupable.PrimaryElement.Temperature ));
-                if (num != 0)
-                    return num;
-                // End added.
-                num = a.PathCost.CompareTo(b.PathCost);
-                if (num != 0)
-                    return num;
-                num = b.foodQuality.CompareTo(a.foodQuality);
-                if (num != 0)
-                    return num;
-                return b.freshness.CompareTo(a.freshness);
-            }
+            MethodInfo info = AccessTools.Method( "FetchManager.PickupComparerIncludingPriority:Compare");
+            if( info == null ) // For some reason the name has to use '+' instead of '.' for the private class.
+                info = AccessTools.Method( "FetchManager+PickupComparerIncludingPriority:Compare");
+            if( info != null )
+                harmony.Patch( info, transpiler: new HarmonyMethod(
+                    typeof( FetchManager_PickupComparerIncludingPriority_Patch ).GetMethod( nameof( Compare ))));
+            else
+                Debug.LogError( "DeliveryTemperatureLimit: Failed to find"
+                    + " FetchManager.PickupComparerIncludingPriority.Compare() for patching" );
         }
 
-        public static readonly PickupComparerIncludingPriority ComparerIncludingPriority = new PickupComparerIncludingPriority();
+        public static IEnumerable<CodeInstruction> Compare(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+            bool found = false;
+            for( int i = 0; i < codes.Count; ++i )
+            {
+//                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                // The function has code:
+                // num = a.masterPriority.CompareTo(b.masterPriority);
+                // if (num != 0)
+                //    return num;
+                // Append:
+                // num = TemperatureLimit.TemperatureIndex( a.pickupable.PrimaryElement.Temperature )
+                //     .CompareTo( TemperatureLimit.TemperatureIndex( b.pickupable.PrimaryElement.Temperature ));
+                // if (num != 0)
+                //     return num;
+                if( codes[ i ].opcode == OpCodes.Ldarga_S && codes[ i ].operand.ToString() == "2"
+                    && i + 9 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Ldflda && codes[ i + 1 ].operand.ToString() == "System.Int32 masterPriority"
+                    && codes[ i + 2 ].opcode == OpCodes.Ldarg_1
+                    && codes[ i + 3 ].opcode == OpCodes.Ldfld && codes[ i + 3 ].operand.ToString() == "System.Int32 masterPriority"
+                    && codes[ i + 4 ].opcode == OpCodes.Call && codes[ i + 4 ].operand.ToString() == "Int32 CompareTo(Int32)"
+                    && CodeInstructionExtensions.IsStloc( codes[ i + 5 ] )
+                    && CodeInstructionExtensions.IsLdloc( codes[ i + 6 ] )
+                    && codes[ i + 7 ].opcode == OpCodes.Brfalse_S
+                    && CodeInstructionExtensions.IsLdloc( codes[ i + 8 ] )
+                    && codes[ i + 9 ].opcode == OpCodes.Ret )
+                {
+                    MethodInfo primaryElement
+                        = AccessTools.Property( typeof( Pickupable ), nameof( Pickupable.PrimaryElement )).GetGetMethod();
+                    MethodInfo temperature
+                        = AccessTools.Property( typeof( PrimaryElement ), nameof( PrimaryElement.Temperature )).GetGetMethod();
+                    codes.Insert( i + 10, new CodeInstruction( OpCodes.Ldarg_1 )); // load 'a'
+                    codes.Insert( i + 11, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
+                        nameof( FetchManager.Pickup.pickupable ))); // load 'a.pickupable'
+                    // get 'a.pickupable.PrimaryElement'
+                    codes.Insert( i + 12, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
+                    // get 'a.pickupable.PrimaryElement.Temperature'
+                    codes.Insert( i + 13, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
+                    codes.Insert( i + 14, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
+                        new Type[] { typeof( float ) } ));
+                    // Need to convert to address.
+                    LocalBuilder tmpVar = generator.DeclareLocal( typeof( int ));
+                    codes.Insert( i + 15, /*CodeInstruction.*/StoreLocal( tmpVar.LocalIndex )); // stloc.1
+                    codes.Insert( i + 16, /*CodeInstruction.*/LoadLocal( tmpVar.LocalIndex, true )); // ldloca.s.1
+
+                    codes.Insert( i + 17, new CodeInstruction( OpCodes.Ldarg_2 )); // load 'b'
+                    codes.Insert( i + 18, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
+                        nameof( FetchManager.Pickup.pickupable ))); // load 'b.pickupable'
+                    // get 'b.pickupable.PrimaryElement'
+                    codes.Insert( i + 19, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
+                    // get 'b.pickupable.PrimaryElement.Temperature'
+                    codes.Insert( i + 20, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
+                    codes.Insert( i + 21, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
+                        new Type[] { typeof( float ) } ));
+
+                    codes.Insert( i + 22, codes[ i + 4 ].Clone()); // CompareTo()
+                    codes.Insert( i + 23, codes[ i + 5 ].Clone()); // stloc
+                    codes.Insert( i + 24, codes[ i + 6 ].Clone()); // ldloc
+                    codes.Insert( i + 25, codes[ i + 7 ].Clone()); // brfalse
+                    codes.Insert( i + 26, codes[ i + 8 ].Clone()); // ldloc
+                    codes.Insert( i + 27, codes[ i + 9 ].Clone()); // ret
+                    found = true;
+                }
+            }
+            if(!found)
+                Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FetchManager.PickupComparerIncludingPriority.Compare()");
+            return codes;
+        }
+// ONI's Harmony is too old to have LocalLocal() and StoreLocal(), so copy&paste from Harmony.
+/*
+MIT License
+
+Copyright (c) 2017 Andreas Pardeike
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+        public static CodeInstruction LoadLocal(int index, bool useAddress = false)
+        {
+            if (useAddress)
+            {
+                if (index < 256) return new CodeInstruction(OpCodes.Ldloca_S, Convert.ToByte(index));
+                else return new CodeInstruction(OpCodes.Ldloca, index);
+            }
+            else
+            {
+                if (index == 0) return new CodeInstruction(OpCodes.Ldloc_0);
+                else if (index == 1) return new CodeInstruction(OpCodes.Ldloc_1);
+                else if (index == 2) return new CodeInstruction(OpCodes.Ldloc_2);
+                else if (index == 3) return new CodeInstruction(OpCodes.Ldloc_3);
+                else if (index < 256) return new CodeInstruction(OpCodes.Ldloc_S, Convert.ToByte(index));
+                else return new CodeInstruction(OpCodes.Ldloc, index);
+            }
+        }
+        public static CodeInstruction StoreLocal(int index)
+        {
+            if (index == 0) return new CodeInstruction(OpCodes.Stloc_0);
+            else if (index == 1) return new CodeInstruction(OpCodes.Stloc_1);
+            else if (index == 2) return new CodeInstruction(OpCodes.Stloc_2);
+            else if (index == 3) return new CodeInstruction(OpCodes.Stloc_3);
+            else if (index < 256) return new CodeInstruction(OpCodes.Stloc_S, Convert.ToByte(index));
+            else return new CodeInstruction(OpCodes.Stloc, index);
+        }
     }
 }
