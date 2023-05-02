@@ -77,6 +77,7 @@ namespace DeliveryTemperatureLimit
                         typeof( ClearableManager_Patch ).GetMethod( nameof( CollectChores_Hook ))));
                     codes.Insert( i + 14, codes[ i + 9 ].Clone()); // if false
                     found = true;
+                    break;
                 }
             }
             if(!found)
@@ -259,6 +260,7 @@ namespace DeliveryTemperatureLimit
                     codes.Insert( i + 6, new CodeInstruction( OpCodes.Call,
                         typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook2 ))));
                     found = true;
+                    break;
                 }
             }
             if(!found)
@@ -412,6 +414,7 @@ namespace DeliveryTemperatureLimit
 
                     codes.Insert( i + 15, codes[ i + 4 ].Clone()); // if not equal
                     found = true;
+                    break;
                 }
             }
             if(!found)
@@ -499,6 +502,7 @@ namespace DeliveryTemperatureLimit
                     codes.Insert( i + 26, codes[ i + 8 ].Clone()); // ldloc
                     codes.Insert( i + 27, codes[ i + 9 ].Clone()); // ret
                     found = true;
+                    break;
                 }
             }
             if(!found)
