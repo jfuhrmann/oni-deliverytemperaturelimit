@@ -34,7 +34,7 @@ namespace DeliveryTemperatureLimit
             MethodInfo info = AccessTools.Method( "ClearableManager:CollectChores" );
             if( info != null )
                 harmony.Patch( info, transpiler: new HarmonyMethod(
-                    typeof( ClearableManager_Patch ).GetMethod( "CollectChores" )));
+                    typeof( ClearableManager_Patch ).GetMethod( nameof( CollectChores ))));
         }
 
         public static IEnumerable<CodeInstruction> CollectChores(IEnumerable<CodeInstruction> instructions)
