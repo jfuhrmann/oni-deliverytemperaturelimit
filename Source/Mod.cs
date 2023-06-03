@@ -1,4 +1,5 @@
 using HarmonyLib;
+using System.Collections.Generic;
 using PeterHan.PLib.Core;
 using PeterHan.PLib.Options;
 
@@ -11,9 +12,12 @@ namespace DeliveryTemperatureLimit
             base.OnLoad( harmony );
             PUtil.InitLibrary( false );
             new POptions().RegisterOptions( this, typeof( Options ));
-            Buildings_Patch.Patch( harmony );
             ClearableManager_Patch.Patch( harmony );
             FetchManager_PickupComparerIncludingPriority_Patch.Patch( harmony );
+        }
+        public override void OnAllModsLoaded(Harmony harmony, IReadOnlyList<KMod.Mod> mods)
+        {
+            Buildings_Patch.Patch( harmony );
         }
     }
 }

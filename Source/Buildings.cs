@@ -56,6 +56,18 @@ namespace DeliveryTemperatureLimit
                 else
                     Debug.LogError( "DeliveryTemperatureLimit: Failed to patch DoPostConfigureComplete() for " + config );
             }
+
+            string[] methods =
+            {
+                // Move This Here
+                "MoveThisHere.HaulingPointConfig",
+            };
+            foreach( string method in methods )
+            {
+                MethodInfo info = AccessTools.Method( method + ":DoPostConfigureComplete");
+                if( info != null )
+                    harmony.Patch( info, prefix: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
+            }
         }
 
         public static void DoPostConfigureComplete(GameObject go)
