@@ -1,5 +1,6 @@
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.UI;
 using System;
 using PeterHan.PLib.Core;
 using PeterHan.PLib.UI;
@@ -18,7 +19,7 @@ namespace DeliveryTemperatureLimit
 
         protected override void OnPrefabInit()
         {
-            var margin = new RectOffset(6, 6, 6, 6);
+            var margin = new RectOffset(4, 4, 4, 4);
             var baseLayout = gameObject.GetComponent<BoxLayoutGroup>();
             if (baseLayout != null)
                 baseLayout.Params = new BoxLayoutParams()
@@ -30,7 +31,7 @@ namespace DeliveryTemperatureLimit
             {
                 Direction = PanelDirection.Horizontal,
                 Margin = margin,
-                Spacing = 8,
+                Spacing = 4,
                 FlexSize = Vector2.right
             };
             PTextField lowInputField = new PTextField( "lowLimit" )
@@ -205,6 +206,32 @@ namespace DeliveryTemperatureLimit
         {
             return STRINGS.TEMPERATURELIMIT.SIDESCREEN_TITLE;
         }
+
+
+        protected override void OnShow(bool show)
+        {
+            base.OnShow( show );
+            if( !show )
+                return;
+            // See ComplexFabricatorSideScreen_Patch below.
+            GameObject complexFabricator = FindComplexFabricatorSideScreen();
+            if( complexFabricator == null || !complexFabricator.activeInHierarchy)
+                return;
+            Canvas.ForceUpdateCanvases(); // for RectTransform to have the proper size
+            ComplexFabricatorSideScreen_Patch.ForceMinWidth( complexFabricator,
+                GetComponent<RectTransform>().rect.size.x );
+        }
+
+        private GameObject FindComplexFabricatorSideScreen()
+        {
+            GameObject parent = PUIUtils.GetParent( gameObject );
+            if( parent == null ) // huh?
+                return null;
+            Transform transform = parent.transform.Find(nameof(ComplexFabricatorSideScreen));
+            if( transform != null )
+                return transform.gameObject;
+            return null;
+        }
     }
 
     [HarmonyPatch(typeof(DetailsScreen))]
@@ -214,6 +241,65 @@ namespace DeliveryTemperatureLimit
         public static void Postfix()
         {
             PUIUtils.AddSideScreenContent<TemperatureLimitSideScreen>();
+        }
+    }
+
+    // The complex fabricator side screen content assumes a specific width
+    // that it fits exactly, but if the side screen is made wider as
+    // happens when used together with this side screen content then
+    // it looks weird, because it's missing parts at the left and right edges.
+    // HACK: Force it to have proper width. There's possibly a better way
+    // to handle that but this is the best I can do with my (lack of) knowledge
+    // of Unity. Basically, find the 2 UI elements that seem to matter,
+    // save their original minimal width the first time, and then use the width
+    // of the TemperatureLimitSideScreen. If no TemperatureLimit component
+    // is present, reset back.
+    [HarmonyPatch(typeof(ComplexFabricatorSideScreen))]
+    public class ComplexFabricatorSideScreen_Patch
+    {
+        private static bool initialSetupDone = false;
+        private static float originalWidth;
+
+        public static void ForceMinWidth( GameObject complexFabricator, float width )
+        {
+            Transform contentsTransform = complexFabricator.transform.Find("Contents");
+            if(contentsTransform != null)
+            {
+                Transform transform = contentsTransform.Find("SelectedRecipeTitleBar");
+                if(transform != null)
+                {
+                    LayoutElement element = transform.gameObject.GetComponent<LayoutElement>();
+                    if( !initialSetupDone )
+                    {
+                        originalWidth = element.minWidth;
+                        initialSetupDone = true;
+                    }
+                    if( width != -1 )
+                        element.minWidth = Mathf.Max( element.minWidth, width );
+                    else
+                        element.minWidth = originalWidth; // reset
+                }
+                transform = contentsTransform.Find("ButtonScrollView");
+                if(transform != null)
+                {
+                    LayoutElement element = transform.gameObject.GetComponent<LayoutElement>();
+                    if( width != -1 )
+                        element.minWidth = Mathf.Max( element.minWidth, width );
+                    else
+                        element.minWidth = originalWidth;
+                }
+            }
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(OnShow))]
+        public static void OnShow( ComplexFabricatorSideScreen __instance, bool show, ComplexFabricator ___targetFab )
+        {
+            if( !show || ___targetFab == null )
+                return;
+            TemperatureLimit limit = ___targetFab.GetComponent< TemperatureLimit >();
+            if( limit == null && initialSetupDone )
+                ForceMinWidth( __instance.gameObject, -1 ); // reset to original width
         }
     }
 }
