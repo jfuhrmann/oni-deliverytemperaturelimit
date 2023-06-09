@@ -75,8 +75,11 @@ namespace DeliveryTemperatureLimit
             foreach( string config in configs )
             {
                 MethodInfo info = AccessTools.Method( config + ":DoPostConfigureComplete");
+                // HACK: Using prefix or postfix makes the game crash, probably a Harmony bug
+                // (even enabling 'Harmony.DEBUG = true;' avoids the problem. Since a finalizer
+                // works just as fine and doesn't cause a crash, use that.
                 if( info != null )
-                    harmony.Patch( info, prefix: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
+                    harmony.Patch( info, finalizer: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
                 else
                     Debug.LogError( "DeliveryTemperatureLimit: Failed to patch DoPostConfigureComplete() for " + config );
             }
@@ -90,7 +93,7 @@ namespace DeliveryTemperatureLimit
             {
                 MethodInfo info = AccessTools.Method( method + ":DoPostConfigureComplete");
                 if( info != null )
-                    harmony.Patch( info, prefix: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
+                    harmony.Patch( info, finalizer: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
             }
         }
 
