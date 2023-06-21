@@ -323,32 +323,6 @@ namespace DeliveryTemperatureLimit
         }
     }
 
-    [HarmonyPatch(typeof(BuildingLoader))]
-    public class BuildingLoader_Patch
-    {
-        [HarmonyPostfix]
-        [HarmonyPatch(nameof(CreateBuildingUnderConstruction))]
-        public static void CreateBuildingUnderConstruction(ref GameObject __result, BuildingDef def)
-        {
-            Options options = POptions.ReadSettings< Options >();
-            if( options != null && options.UnderConstructionLimit )
-            {
-                TemperatureLimit limit = __result.AddOrGet<TemperatureLimit>();
-                limit.SetLowLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                    options.MinConstructionTemperature, GameUtil.temperatureUnit )));
-                float totalMass = 0;
-                foreach( float mass in def.Mass )
-                    totalMass += mass;
-                if( totalMass > 25 )
-                    limit.SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                        options.MaxConstructionTemperature, GameUtil.temperatureUnit )));
-                else
-                    limit.SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                        options.MaxSmallConstructionTemperature, GameUtil.temperatureUnit )));
-            }
-        }
-    }
-
     // FetchManager keeps a list of available Pickupable's, and (for presumably performance reasons)
     // it sorts them by tag+priority+cost, and then keeps only the cheapest one for each tag+priority.
     // This needs to be changed to keep one for each tag+priority+temperatureindex, otherwise

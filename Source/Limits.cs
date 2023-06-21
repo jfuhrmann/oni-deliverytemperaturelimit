@@ -39,11 +39,15 @@ namespace DeliveryTemperatureLimit
 
         private void OnCopySettings(object data)
         {
-            TemperatureLimit component = ((GameObject)data).GetComponent<TemperatureLimit>();
-            if (component != null)
+            CopySettings(((GameObject)data).GetComponent<TemperatureLimit>());
+        }
+
+        public void CopySettings( TemperatureLimit source )
+        {
+            if (source != null)
             {
-                lowLimit = component.lowLimit;
-                highLimit = component.highLimit;
+                lowLimit = source.lowLimit;
+                highLimit = source.highLimit;
                 SetDirty();
             }
         }

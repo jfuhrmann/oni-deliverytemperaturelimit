@@ -6,6 +6,8 @@ namespace STRINGS
     {
         public static LocString LABEL = "Delivery Temperatures:";
 
+        public static LocString LABEL_SHORT = "Temperatures:";
+
         public static LocString RANGE_SEPARATOR = "-";
 
         public static LocString TOOLTIP_RANGE = "Only objects in the temperature range from <b>{0}</b> to <b>{1}</b> may be delivered";

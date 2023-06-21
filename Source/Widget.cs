@@ -18,6 +18,8 @@ namespace DeliveryTemperatureLimit
 
         protected override void OnPrefabInit()
         {
+            bool isConstruction = gameObject.GetComponent<MaterialSelectionPanel>() != null;
+
             var margin = new RectOffset(4, 4, 4, 4);
             var baseLayout = gameObject.GetComponent<BoxLayoutGroup>();
             if (baseLayout != null)
@@ -50,7 +52,8 @@ namespace DeliveryTemperatureLimit
             PLabel label = new PLabel( "label" )
             {
                 TextStyle = PUITuning.Fonts.TextDarkStyle,
-                Text = STRINGS.TEMPERATURELIMIT.LABEL
+                Text = isConstruction ? STRINGS.TEMPERATURELIMIT.LABEL_SHORT
+                    : STRINGS.TEMPERATURELIMIT.LABEL
             };
             PLabel separator = new PLabel( "separator" )
             {
