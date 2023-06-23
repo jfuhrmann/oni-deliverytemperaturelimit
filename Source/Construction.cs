@@ -76,5 +76,17 @@ namespace DeliveryTemperatureLimit
                 return;
             __result.AddOrGet<TemperatureLimit>().CopySettings( Construction.limit );
         }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(PostProcess))]
+        public static void PostProcess(BuildingDef __instance)
+        {
+            if( !Options.Instance.UnderConstructionLimit )
+                return;
+            if( __instance.BuildingUnderConstruction == null )
+                return;
+            // needs to be added for all to make loading from saves work
+            __instance.BuildingUnderConstruction.gameObject.AddOrGet<TemperatureLimit>();
+        }
     }
 }
