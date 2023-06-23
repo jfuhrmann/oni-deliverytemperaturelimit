@@ -72,6 +72,8 @@ namespace DeliveryTemperatureLimit
         {
             if( !Options.Instance.UnderConstructionLimit || Construction.limit == null )
                 return;
+            if( __result == null ) // MoveThisHere mod patches the function to bail out
+                return;
             __result.AddOrGet<TemperatureLimit>().CopySettings( Construction.limit );
         }
     }
