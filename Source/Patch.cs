@@ -170,11 +170,15 @@ namespace DeliveryTemperatureLimit
 
         public static bool Begin_Hook2( FetchChore rootChore, FetchChore fetchChore2 )
         {
+            // This checks whether the second chore can be handled as a part of the root chore.
+            // Therefore add a check if the second chore's range is compatible.
             TemperatureLimit limit = rootChore?.destination?.GetComponent< TemperatureLimit >();
-            Pickupable pickupable2 = fetchChore2?.fetchTarget;
-            if( limit == null || limit.IsDisabled() || pickupable2 == null )
+            TemperatureLimit limit2 = fetchChore2?.destination?.GetComponent< TemperatureLimit >();
+            if( limit == limit2 || limit2 == null || limit2.IsDisabled())
                 return true;
-            return limit.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
+            if( limit == null )
+                return false; // by now limit2 is a valid range
+            return limit2.LowLimit >= limit.LowLimit && limit2.HighLimit <= limit.HighLimit;
         }
     }
 
