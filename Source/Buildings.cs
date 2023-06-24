@@ -88,6 +88,8 @@ namespace DeliveryTemperatureLimit
             {
                 // Move This Here
                 "MoveThisHere.HaulingPointConfig",
+                // Storage Pod
+                "StoragePod.StoragePodConfig",
             };
             foreach( string method in methods )
             {
