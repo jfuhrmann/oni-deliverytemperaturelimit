@@ -25,6 +25,18 @@ namespace DeliveryTemperatureLimit
         public int LowLimit => lowLimit;
         public int HighLimit => highLimit;
 
+        // GetComponent() calls may add up being somewhat expensive when called often,
+        // so instead cache the mapping.
+        private static Dictionary< GameObject, TemperatureLimit > fastMap
+            = new Dictionary< GameObject, TemperatureLimit >();
+
+        public static TemperatureLimit Get( GameObject gameObject )
+        {
+            if( fastMap.TryGetValue( gameObject, out TemperatureLimit limit ))
+                return limit;
+            return null;
+        }
+
         private static readonly EventSystem.IntraObjectHandler<TemperatureLimit> OnCopySettingsDelegate
             = new EventSystem.IntraObjectHandler<TemperatureLimit>(delegate(TemperatureLimit component, object data)
         {
@@ -39,7 +51,7 @@ namespace DeliveryTemperatureLimit
 
         private void OnCopySettings(object data)
         {
-            CopySettings(((GameObject)data).GetComponent<TemperatureLimit>());
+            CopySettings( TemperatureLimit.Get((GameObject)data));
         }
 
         public void CopySettings( TemperatureLimit source )
@@ -81,6 +93,7 @@ namespace DeliveryTemperatureLimit
         protected override void OnSpawn()
         {
             base.OnSpawn();
+            fastMap[ gameObject ] = this;
             if( highLimit == 0 )
             {
                 TemperatureLimits oldLimit = GetComponent< TemperatureLimits >();
@@ -99,6 +112,7 @@ namespace DeliveryTemperatureLimit
         {
             allLimits.Remove( this );
             SetDirty();
+            fastMap.Remove( gameObject );
             base.OnCleanUp();
         }
 

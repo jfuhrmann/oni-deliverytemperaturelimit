@@ -23,7 +23,7 @@ namespace DeliveryTemperatureLimit
 
         public override bool IsValidForTarget(GameObject target)
         {
-            return target.GetComponent<TemperatureLimit>() != null;
+            return TemperatureLimit.Get( target ) != null;
         }
 
         public override void SetTarget(GameObject new_target)
@@ -33,7 +33,7 @@ namespace DeliveryTemperatureLimit
                 Debug.LogError("Invalid gameObject received");
                 return;
             }
-            target = new_target.GetComponent<TemperatureLimit>();
+            target = TemperatureLimit.Get( new_target );
             if (target == null)
             {
                 Debug.LogError("The gameObject received does not contain a TemperatureLimit component");
@@ -137,7 +137,7 @@ namespace DeliveryTemperatureLimit
         {
             if( !show || ___targetFab == null )
                 return;
-            TemperatureLimit limit = ___targetFab.GetComponent< TemperatureLimit >();
+            TemperatureLimit limit = TemperatureLimit.Get( ___targetFab.gameObject );
             if( limit == null && initialSetupDone )
                 ForceMinWidth( __instance.gameObject, -1 ); // reset to original width
         }

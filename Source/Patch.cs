@@ -17,7 +17,7 @@ namespace DeliveryTemperatureLimit
         {
             if( !__result )
                 return;
-            TemperatureLimit limit = destination.GetComponent< TemperatureLimit >();
+            TemperatureLimit limit = TemperatureLimit.Get( destination.gameObject );
             if( limit == null || limit.IsDisabled())
                 return;
             __result = limit.AllowedByTemperature( pickup.PrimaryElement.Temperature );
@@ -87,7 +87,7 @@ namespace DeliveryTemperatureLimit
 
         public static bool CollectChores_Hook( FetchChore chore, Pickupable pickupable )
         {
-            TemperatureLimit limit = chore.destination?.GetComponent< TemperatureLimit >();
+            TemperatureLimit limit = TemperatureLimit.Get( chore.destination?.gameObject );
             if( limit == null || limit.IsDisabled())
                 return true;
             if( pickupable?.PrimaryElement != null )
@@ -162,7 +162,7 @@ namespace DeliveryTemperatureLimit
 
         public static bool Begin_Hook1( FetchChore rootChore, Pickupable pickupable2 )
         {
-            TemperatureLimit limit = rootChore.destination?.GetComponent< TemperatureLimit >();
+            TemperatureLimit limit = TemperatureLimit.Get( rootChore.destination?.gameObject );
             if( limit == null || limit.IsDisabled())
                 return true;
             return limit.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
@@ -172,8 +172,8 @@ namespace DeliveryTemperatureLimit
         {
             // This checks whether the second chore can be handled as a part of the root chore.
             // Therefore add a check if the second chore's range is compatible.
-            TemperatureLimit limit = rootChore?.destination?.GetComponent< TemperatureLimit >();
-            TemperatureLimit limit2 = fetchChore2?.destination?.GetComponent< TemperatureLimit >();
+            TemperatureLimit limit = TemperatureLimit.Get( rootChore?.destination?.gameObject );
+            TemperatureLimit limit2 = TemperatureLimit.Get( fetchChore2?.destination?.gameObject );
             if( limit == limit2 || limit2 == null || limit2.IsDisabled())
                 return true;
             if( limit == null )
@@ -284,7 +284,7 @@ namespace DeliveryTemperatureLimit
 
         public static void UpdateStorageFetchableBits_Hook2(FetchChore chore)
         {
-            TemperatureLimit limit = chore.destination.GetComponent< TemperatureLimit >();
+            TemperatureLimit limit = TemperatureLimit.Get( chore.destination.gameObject );
             if( limit == null || limit.IsDisabled())
             {
                 foreach( Tag tag in chore.tags )
