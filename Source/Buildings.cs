@@ -21,6 +21,7 @@ namespace DeliveryTemperatureLimit
                nameof(CreatureFeederConfig),
                nameof(PlanterBoxConfig),
                nameof(FarmTileConfig),
+               nameof(HydroponicFarmConfig),
                nameof(AirFilterConfig),
                nameof(WaterPurifierConfig),
                nameof(RockCrusherConfig),
