@@ -17,7 +17,9 @@ namespace DeliveryTemperatureLimit
         }
         public override void OnAllModsLoaded(Harmony harmony, IReadOnlyList<KMod.Mod> mods)
         {
+            base.OnAllModsLoaded( harmony, mods );
             Buildings_Patch.Patch( harmony );
+            ChoreComparator_Patch.Patch( harmony );
         }
     }
 }
