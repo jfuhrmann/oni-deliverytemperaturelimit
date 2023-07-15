@@ -20,6 +20,7 @@ namespace DeliveryTemperatureLimit
             base.OnAllModsLoaded( harmony, mods );
             Buildings_Patch.Patch( harmony );
             ChoreComparator_Patch.Patch( harmony );
+            FetchManagerFastUpdate_PickupTagDict_Patch.Patch( harmony );
         }
     }
 }

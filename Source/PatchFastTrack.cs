@@ -79,4 +79,66 @@ namespace DeliveryTemperatureLimit
             return true;
         }
     }
+
+    public class FetchManagerFastUpdate_PickupTagDict_Patch
+    {
+        public static void Patch( Harmony harmony )
+        {
+            MethodInfo info = AccessTools.Method( "PeterHan.FastTrack.GamePatches.FetchManagerFastUpdate+PickupTagDict:AddItem" );
+            if( info != null )
+                harmony.Patch( info, transpiler: new HarmonyMethod(
+                    typeof( FetchManagerFastUpdate_PickupTagDict_Patch ).GetMethod( nameof( AddItem ))));
+        }
+
+        public static IEnumerable<CodeInstruction> AddItem(IEnumerable<CodeInstruction> instructions)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+            bool found = false;
+            for( int i = 0; i < codes.Count; ++i )
+            {
+                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                // The function has code:
+                // var key = new PickupTagKey(hash, target.KPrefabID);
+                // Change to:
+                // var key = new PickupTagKey(AddItem_Hook(hash, target), target.KPrefabID);
+                if( codes[ i ].opcode == OpCodes.Ldloca_S && codes[ i ].operand.ToString().StartsWith(
+                        "PeterHan.FastTrack.GamePatches.FetchManagerFastUpdate+PickupTagKey" )
+                    && i + 4 < codes.Count
+                    && codes[ i + 1 ].IsLdloc()
+                    && codes[ i + 2 ].IsLdloc()
+                    && codes[ i + 3 ].opcode == OpCodes.Ldfld
+                    && codes[ i + 3 ].operand.ToString() == "KPrefabID KPrefabID"
+                    && codes[ i + 4 ].opcode == OpCodes.Call
+                    && codes[ i + 4 ].operand.ToString() == "Void .ctor(Int32, KPrefabID)" )
+                {
+                    codes.Insert( i + 2, codes[ i + 2 ].Clone()); // load 'target'
+                    codes.Insert( i + 3, new CodeInstruction( OpCodes.Call,
+                        typeof( FetchManagerFastUpdate_PickupTagDict_Patch ).GetMethod( nameof( AddItem_Hook ))));
+                    found = true;
+                    break;
+                }
+            }
+            if(!found)
+                Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FastTrack FetchManagerFastUpdate.PickupTagDict.AddItem()");
+            return codes;
+        }
+
+        public static int AddItem_Hook( int hash, Pickupable pickupable )
+        {
+            if( pickupable?.PrimaryElement == null )
+                return hash;
+            // AddItem() uses a Dictionary with only tagBitsHash as the key, so it merges together pickupables
+            // that belong into different temperature index groups. Add the temperature index to the hash to make
+            // the dictionary key distinct. The key is not used for anything else than dictionary access, so this
+            // should be ok.
+            int num = hash;
+            int index = TemperatureLimit.TemperatureIndex( pickupable.PrimaryElement.Temperature );
+            // The tagBitsHash value originally comes from Tag.GetHashCode(), and the Tag class uses Hash.SDBMLower().
+            // This line is basically the line that computes Hash.SDBMLower(), so the temperature index should act
+            // as another "character". Hopefully using the same hash code makes it extremely unlikely that
+            // adding the temperature index would lead to collisions.
+            num = index + (num << 6) + (num << 16) - num;
+            return num;
+        }
+    }
 }
