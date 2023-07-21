@@ -96,7 +96,7 @@ namespace DeliveryTemperatureLimit
             bool found = false;
             for( int i = 0; i < codes.Count; ++i )
             {
-                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+//                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
                 // The function has code:
                 // var key = new PickupTagKey(hash, target.KPrefabID);
                 // Change to:
