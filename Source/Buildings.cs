@@ -31,6 +31,7 @@ namespace DeliveryTemperatureLimit
                nameof(MetalRefineryConfig),
                nameof(GlassForgeConfig),
                nameof(SublimationStationConfig),
+               nameof(LonelyMinionHouseConfig),
 #if false
                nameof(WaterCoolerConfig),
                nameof(JuicerConfig),
