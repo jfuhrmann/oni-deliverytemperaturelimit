@@ -32,12 +32,12 @@ namespace DeliveryTemperatureLimit
                nameof(GlassForgeConfig),
                nameof(SublimationStationConfig),
                nameof(LonelyMinionHouseConfig),
+               nameof(ResearchCenterConfig),
 #if false
                nameof(WaterCoolerConfig),
                nameof(JuicerConfig),
                nameof(AlgaeHabitatConfig),
                nameof(WoodGasGeneratorConfig),
-               nameof(ResearchCenterConfig),
                nameof(AdvancedResearchCenterConfig),
                nameof(RustDeoxidizerConfig),
                nameof(MechanicalSurfboardConfig),
