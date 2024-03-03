@@ -1,40 +1,44 @@
 using HarmonyLib;
 using UnityEngine;
 using PeterHan.PLib.UI;
-using System;
+using System.Reflection;
 
 namespace DeliveryTemperatureLimit
 {
-    public static class Construction
-    {
-        // There is just one MaterialSelectionPanel instance, so keep one limit instance.
-        public static TemperatureLimit limit = null;
-
-        public static void ResetConstructionLimit()
-        {
-            if( !Options.Instance.UnderConstructionLimit || limit == null )
-                return;
-            limit.SetLowLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                Options.Instance.MinConstructionTemperature, GameUtil.temperatureUnit )));
-            limit.SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                Options.Instance.MaxConstructionTemperature, GameUtil.temperatureUnit )));
-        }
-    }
-
     [HarmonyPatch(typeof(MaterialSelectionPanel))]
     public class MaterialSelectionPanel_Patch
     {
+        private static FieldInfo sideScreenMaterialContentBodyField
+            = AccessTools.Field( typeof( DetailsScreen ), "sideScreenMaterialContentBody" );
+        private static FieldInfo materialSelectionPanelField
+            = AccessTools.Field( typeof( DetailsScreenMaterialPanel ), "materialSelectionPanel" );
+
+        // There are several MaterialSelectionPanel instances (build menu,
+        // building rocket modules, the change material tab), share just one
+        // singleton for all of them (and the change material tab case will be
+        // ignored).
+        public static TemperatureLimit limit = null;
+
         [HarmonyPostfix]
         [HarmonyPatch(nameof(OnPrefabInit))]
         public static void OnPrefabInit(MaterialSelectionPanel __instance)
         {
             if( !Options.Instance.UnderConstructionLimit )
                 return;
-            // Create and set the singleton instance.
-            Construction.limit = __instance.gameObject.AddOrGet<TemperatureLimit>();
-            Construction.ResetConstructionLimit();
+            // Ignore the change material case. It results in a deconstruct+construct combo,
+            // and it'd be necessary to carry-over the temperatures, which the game can't do even
+            // for settings of the building. Reconsider when that is implemented.
+            GameObject sideScreenMaterialContentBody = (GameObject) sideScreenMaterialContentBodyField
+                .GetValue( DetailsScreen.Instance );
+            DetailsScreenMaterialPanel detailsScreenMaterialPanel = sideScreenMaterialContentBody
+                .GetComponentInChildren<DetailsScreenMaterialPanel>();
+            if( __instance == (MaterialSelectionPanel) materialSelectionPanelField.GetValue( detailsScreenMaterialPanel ))
+                return;
+            // Create and set the build singleton instance, it shouldn't matter in which game object it is.
+            if( limit == null )
+                limit = __instance.gameObject.AddOrGet< TemperatureLimit >();
+            limit.ResetToConstructionDefaults();
             TemperatureLimitWidget widget = __instance.gameObject.AddOrGet<TemperatureLimitWidget>();
-            widget.SetTarget( Construction.limit );
         }
 
         [HarmonyPostfix]
@@ -44,22 +48,9 @@ namespace DeliveryTemperatureLimit
             if( !Options.Instance.UnderConstructionLimit )
                 return;
             TemperatureLimitWidget widget = __instance.GetComponent<TemperatureLimitWidget>();
-            widget.SetTarget( Construction.limit );
-        }
-
-    }
-
-    // Reset the limit to the configured default whenever the build priority is reset.
-    // It seems that there is just one priority screen instance shared by everything,
-    // so reset when that is reset.
-    [HarmonyPatch(typeof(PriorityScreen))]
-    public class PriorityScreen_Patch
-    {
-        [HarmonyPostfix]
-        [HarmonyPatch(nameof(ResetPriority))]
-        public static void ResetPriority()
-        {
-            Construction.ResetConstructionLimit();
+            if( widget == null )
+                return;
+            widget.SetTarget( limit );
         }
     }
 
@@ -70,11 +61,14 @@ namespace DeliveryTemperatureLimit
         [HarmonyPatch(nameof(Instantiate))]
         public static void Instantiate(BuildingDef __instance, GameObject __result)
         {
-            if( !Options.Instance.UnderConstructionLimit || Construction.limit == null )
+            if( !Options.Instance.UnderConstructionLimit )
                 return;
             if( __result == null ) // MoveThisHere mod patches the function to bail out
                 return;
-            __result.AddOrGet<TemperatureLimit>().CopySettings( Construction.limit );
+            TemperatureLimit limit = MaterialSelectionPanel_Patch.limit;
+            if( limit == null )
+                return;
+            __result.AddOrGet<TemperatureLimit>().CopySettings( limit );
         }
 
         [HarmonyPostfix]

@@ -179,5 +179,13 @@ namespace DeliveryTemperatureLimit
             PUIElements.SetToolTip( lowInput, tooltip );
             PUIElements.SetToolTip( highInput, tooltip );
         }
+
+        protected override void OnDisable()
+        {
+            // This should be called whenever the widget is hidden, reset the widget
+            // values.
+            if( target != null )
+                target.ResetToConstructionDefaults();
+        }
     }
 }
