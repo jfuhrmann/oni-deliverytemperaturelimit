@@ -4,9 +4,7 @@ namespace STRINGS
 {
     public class TEMPERATURELIMIT
     {
-        public static LocString LABEL = "Delivery Temperatures:";
-
-        public static LocString LABEL_SHORT = "Temperatures:";
+        public static LocString LABEL = "Temperatures:";
 
         public static LocString RANGE_SEPARATOR = "-";
 
