@@ -195,14 +195,6 @@ namespace DeliveryTemperatureLimit
                 return temperaturesToIndex[ (int) temperature ];
             return -1;
         }
-
-        public void ResetToConstructionDefaults()
-        {
-            SetLowLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                Options.Instance.MinConstructionTemperature, GameUtil.temperatureUnit )));
-            SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
-                Options.Instance.MaxConstructionTemperature, GameUtil.temperatureUnit )));
-        }
     }
 
     // Backwards compatibility.

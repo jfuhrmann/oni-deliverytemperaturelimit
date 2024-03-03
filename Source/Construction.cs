@@ -1,6 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 using PeterHan.PLib.UI;
+using System;
 using System.Reflection;
 
 namespace DeliveryTemperatureLimit
@@ -37,7 +38,7 @@ namespace DeliveryTemperatureLimit
             // Create and set the build singleton instance, it shouldn't matter in which game object it is.
             if( limit == null )
                 limit = __instance.gameObject.AddOrGet< TemperatureLimit >();
-            limit.ResetToConstructionDefaults();
+            CheckResetToConstructionDefaults( limit );
             TemperatureLimitWidget widget = __instance.gameObject.AddOrGet<TemperatureLimitWidget>();
         }
 
@@ -51,6 +52,16 @@ namespace DeliveryTemperatureLimit
             if( widget == null )
                 return;
             widget.SetTarget( limit );
+        }
+
+        public static void CheckResetToConstructionDefaults( TemperatureLimit checkLimit )
+        {
+            if( checkLimit != limit || limit == null )
+                return;
+            limit.SetLowLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
+                Options.Instance.MinConstructionTemperature, GameUtil.temperatureUnit )));
+            limit.SetHighLimit( (int) Math.Round( GameUtil.GetTemperatureConvertedToKelvin(
+                Options.Instance.MaxConstructionTemperature, GameUtil.temperatureUnit )));
         }
     }
 

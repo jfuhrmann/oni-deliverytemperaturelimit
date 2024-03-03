@@ -183,9 +183,8 @@ namespace DeliveryTemperatureLimit
         protected override void OnDisable()
         {
             // This should be called whenever the widget is hidden, reset the widget
-            // values.
-            if( target != null )
-                target.ResetToConstructionDefaults();
+            // values if it's for construction.
+            MaterialSelectionPanel_Patch.CheckResetToConstructionDefaults( target );
         }
     }
 }
