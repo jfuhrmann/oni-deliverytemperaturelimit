@@ -195,6 +195,22 @@ namespace DeliveryTemperatureLimit
                 return temperaturesToIndex[ (int) temperature ];
             return -1;
         }
+
+        public static System.Int16[] TemperatureIndexesList()
+        {
+            if( limitsDirty )
+                UpdateIndexes();
+            return temperaturesToIndex;
+        }
+
+        public (int, int) TemperatureIndexes()
+        {
+            if( limitsDirty )
+                UpdateIndexes();
+            if( highLimit > lowLimit )
+                return ( temperaturesToIndex[ lowLimit ], temperaturesToIndex[ highLimit - 1 ] );
+            return ( -1, -1 );
+        }
     }
 
     // Backwards compatibility.
