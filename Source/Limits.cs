@@ -203,13 +203,17 @@ namespace DeliveryTemperatureLimit
             return temperaturesToIndex;
         }
 
+        // The range end is exclusive.
         public (int, int) TemperatureIndexes()
         {
             if( limitsDirty )
                 UpdateIndexes();
-            if( highLimit > lowLimit )
-                return ( temperaturesToIndex[ lowLimit ], temperaturesToIndex[ highLimit - 1 ] );
-            return ( -1, -1 );
+            // MaxValue is actually beyond indexes (there can't be any index after it),
+            // so handle that.
+            int highIndex = indexTemperatures.Count; // one beyond last
+            if( highLimit != MaxValue )
+                highIndex = temperaturesToIndex[ highLimit ];
+            return ( temperaturesToIndex[ lowLimit ], highIndex );
         }
     }
 
