@@ -156,7 +156,16 @@ namespace DeliveryTemperatureLimit
             // for all indexes included in the range.
             // TODO: Would it be worth it to cache this?
             for( int index = lowIndex; index < highIndex; ++index )
-                total += worldAmounts[ worldId ][ ( tag, index ) ];
+            {
+                // This is a race condition, as the indexes may change before the world amounts
+                // info is updated, so cope with that. The proper value will eventually be calculated.
+                try
+                {
+                    total += worldAmounts[ worldId ][ ( tag, index ) ];
+                } catch( KeyNotFoundException )
+                {
+                }
+            }
             // Treat total and available the same. The latter is the sooner, with reserved amounts removed,
             // but the MaterialNeeds class also does not include temperature, and tracking that would be a lot of work
             // for minimal gain. At worst this should result in insufficient resources getting reported with a delay,
