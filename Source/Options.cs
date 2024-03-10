@@ -8,6 +8,7 @@ namespace DeliveryTemperatureLimit
     [JsonObject(MemberSerialization.OptIn)]
     [ModInfo("https://github.com/llunak/oni-deliverytemperaturelimit")]
     [ConfigFile(SharedConfigLocation: true)]
+    [RestartRequired]
     public sealed class Options : SingletonOptions< Options >, IOptions
     {
         [Option("Imprecise Status Items", "Status items such as 'Building lacks resources' will be fast but may be incorrect if temperature limits prevent delivery.")]
