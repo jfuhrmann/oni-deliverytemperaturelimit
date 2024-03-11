@@ -94,16 +94,6 @@ namespace DeliveryTemperatureLimit
         {
             base.OnSpawn();
             fastMap[ gameObject ] = this;
-            if( highLimit == 0 )
-            {
-                TemperatureLimits oldLimit = GetComponent< TemperatureLimits >();
-                if( oldLimit != null && !oldLimit.IsDisabled())
-                {
-                    lowLimit = oldLimit.LowLimit;
-                    highLimit = oldLimit.HighLimit;
-                    oldLimit.Reset();
-                }
-            }
             allLimits.Add( this );
             SetDirty();
         }
@@ -214,28 +204,6 @@ namespace DeliveryTemperatureLimit
             if( highLimit != MaxValue )
                 highIndex = temperaturesToIndex[ highLimit ];
             return ( temperaturesToIndex[ lowLimit ], highIndex );
-        }
-    }
-
-    // Backwards compatibility.
-    // TODO: remove?
-    public class TemperatureLimits : KMonoBehaviour
-    {
-        [Serialize]
-        [SerializeField]
-        private float lowLimit = 0;
-
-        [Serialize]
-        [SerializeField]
-        private float highLimit = 0;
-
-        public bool IsDisabled() => ( highLimit == 0 );
-        public int LowLimit => (int)lowLimit;
-        public int HighLimit => (int)highLimit;
-        public void Reset()
-        {
-            lowLimit = 0;
-            highLimit = 0;
         }
     }
 }
