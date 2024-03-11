@@ -11,9 +11,9 @@ namespace DeliveryTemperatureLimit
     [RestartRequired]
     public sealed class Options : SingletonOptions< Options >, IOptions
     {
-        [Option("Imprecise Status Items", "Status items such as 'Building lacks resources' will be fast but may be incorrect if temperature limits prevent delivery.")]
+        [Option("Check Temperature For Status Items", "Status items such as 'Building lacks resources' will be shown if resources are available but not allowed by temperature limits.")]
         [JsonProperty]
-        public bool ImpreciseStatusItems { get; set; }
+        public bool CheckTemperatureForStatusItems { get; set; }
 
         [Option("Under Construction Limit", "Limit also deliveries to buildings under construction.")]
         [JsonProperty]
@@ -29,7 +29,7 @@ namespace DeliveryTemperatureLimit
 
         public Options()
         {
-            ImpreciseStatusItems = false;
+            CheckTemperatureForStatusItems = true;
             UnderConstructionLimit = false;
             MaxConstructionTemperature = (int) Math.Round( GameUtil.GetTemperatureConvertedFromKelvin(
                 45 + 273.15f, GameUtil.temperatureUnit ));
@@ -39,7 +39,7 @@ namespace DeliveryTemperatureLimit
 
         public override string ToString()
         {
-            return $"DeliveryTemperatureLimit.Options[imprecisestatusitems={ImpreciseStatusItems},"
+            return $"DeliveryTemperatureLimit.Options[checktemperatureforstatusitems={CheckTemperatureForStatusItems},"
                 + $"DeliveryTemperatureLimit.Options[underconstructionlimit={UnderConstructionLimit},"
                 + $"maxconstructiontemperature={MaxConstructionTemperature},"
                 + $"minconstructiontemperature={MinConstructionTemperature}]";

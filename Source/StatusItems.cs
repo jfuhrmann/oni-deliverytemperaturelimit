@@ -18,7 +18,7 @@ namespace DeliveryTemperatureLimit
     {
         public static void Patch( Harmony harmony )
         {
-            if( Options.Instance.ImpreciseStatusItems )
+            if( !Options.Instance.CheckTemperatureForStatusItems )
                 return;
 
             MethodInfo infoRender200ms = AccessTools.Method(
