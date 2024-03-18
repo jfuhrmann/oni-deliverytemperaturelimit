@@ -318,8 +318,9 @@ namespace DeliveryTemperatureLimit
                 currentAmounts = new AmountByTagIndexDict();
                 worldAmounts[ worldId ] = currentAmounts;
             }
-            foreach( int temperatureIndex in TemperatureLimit.TemperatureIndexesList())
-                currentAmounts[ ( key, temperatureIndex ) ] = 0;
+            int maxTemperatureIndex = TemperatureLimit.MaxTemperatureIndex();
+            for( int i = 0; i <= maxTemperatureIndex; ++i )
+                currentAmounts[ ( key, i ) ] = 0;
         }
 
         public static void UpdateInventory( Pickupable item, Tag key )

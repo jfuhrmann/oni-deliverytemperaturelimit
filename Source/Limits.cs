@@ -133,8 +133,6 @@ namespace DeliveryTemperatureLimit
         // temperatures, and TemperatureIndex() seems to be called for hot code, so replace
         // lookup in a loop with O(1) indexing.
         private static System.Int16[] temperaturesToIndex;
-        // This is simply 0..indexTemperatures.Count-1.
-        private static int[] temperaturesIndexesList;
 
         private static void SetDirty()
         {
@@ -172,11 +170,7 @@ namespace DeliveryTemperatureLimit
                         while( pos < value )
                             newTemperaturesToIndex[ pos++ ] = i;
                     }
-                    int[] newTemperaturesIndexesList = new int[ tmp.Count ];
-                    for( int i = 0; i < tmp.Count; ++i )
-                        newTemperaturesIndexesList[ i ] = i;
                     Interlocked.Exchange( ref indexTemperatures, tmp );
-                    Interlocked.Exchange( ref temperaturesIndexesList, newTemperaturesIndexesList );
                     Interlocked.Exchange( ref temperaturesToIndex, newTemperaturesToIndex );
                 }
                 limitsDirty = false;
@@ -192,11 +186,11 @@ namespace DeliveryTemperatureLimit
             return -1;
         }
 
-        public static int[] TemperatureIndexesList()
+        public static int MaxTemperatureIndex()
         {
             if( limitsDirty )
                 UpdateIndexes();
-            return temperaturesIndexesList;
+            return indexTemperatures.Count - 1;
         }
 
         // The range end is exclusive.
