@@ -357,8 +357,7 @@ namespace DeliveryTemperatureLimit
                 // if (pickup.masterPriority == pickup2.masterPriority && tagBitsHash == num)
                 // Change to:
                 // if (.. && tagBitsHash == num
-                //     && TemperatureLimit.TemperatureIndex( pickup.pickupable.PrimaryElement.Temperature )
-                //         == TemperatureLimit.TemperatureIndex( pickup2.pickupable.PrimaryElement.Temperature ))
+                //     && UpdatePickups_Hook( pickup, pickup2 ) == 1 )
                 if( codes[ i ].opcode == OpCodes.Ldfld && codes[ i ].operand.ToString() == "System.Int32 masterPriority"
                     && i + 4 < codes.Count && pickupLoad != -1 && pickup2Load != -1
                     && codes[ i + 1 ].opcode == OpCodes.Bne_Un_S
@@ -366,31 +365,12 @@ namespace DeliveryTemperatureLimit
                     && CodeInstructionExtensions.IsLdloc( codes[ i + 3 ] )
                     && codes[ i + 4 ].opcode == OpCodes.Bne_Un_S )
                 {
-                    MethodInfo primaryElement
-                        = AccessTools.Property( typeof( Pickupable ), nameof( Pickupable.PrimaryElement )).GetGetMethod();
-                    MethodInfo temperature
-                        = AccessTools.Property( typeof( PrimaryElement ), nameof( PrimaryElement.Temperature )).GetGetMethod();
                     codes.Insert( i + 5, codes[ pickupLoad ].Clone()); // load 'pickup'
-                    codes.Insert( i + 6, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
-                        nameof( FetchManager.Pickup.pickupable ))); // load 'pickup.pickupable'
-                    // get 'pickup.pickupable.PrimaryElement'
-                    codes.Insert( i + 7, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
-                    // get 'pickup.pickupable.PrimaryElement.Temperature'
-                    codes.Insert( i + 8, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
-                    codes.Insert( i + 9, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
-                        new Type[] { typeof( float ) } ));
-
-                    codes.Insert( i + 10, codes[ pickup2Load ].Clone()); // load 'pickup2'
-                    codes.Insert( i + 11, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
-                        nameof( FetchManager.Pickup.pickupable ))); // load 'pickup2.pickupable'
-                    // get 'pickup2.pickupable.PrimaryElement'
-                    codes.Insert( i + 12, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
-                    // get 'pickup2.pickupable.PrimaryElement.Temperature'
-                    codes.Insert( i + 13, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
-                    codes.Insert( i + 14, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
-                        new Type[] { typeof( float ) } ));
-
-                    codes.Insert( i + 15, codes[ i + 4 ].Clone()); // if not equal
+                    codes.Insert( i + 6, codes[ pickup2Load ].Clone()); // load 'pickup2'
+                    codes.Insert( i + 7, new CodeInstruction( OpCodes.Call,
+                        typeof( FetchManager_FetchablesByPrefabId_Patch ).GetMethod( nameof( UpdatePickups_Hook ))));
+                    codes.Insert( i + 8, new CodeInstruction( OpCodes.Ldc_I4_1 )); // load '1' (so that the == test can be reused)
+                    codes.Insert( i + 9, codes[ i + 4 ].Clone()); // if not equal
                     found = true;
                     break;
                 }
@@ -398,6 +378,13 @@ namespace DeliveryTemperatureLimit
             if(!found)
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FetchManager.FetchablesByPrefabId.UpdatePickups()");
             return codes;
+        }
+
+        public static int UpdatePickups_Hook( FetchManager.Pickup pickup, FetchManager.Pickup pickup2 )
+        {
+            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            return data.TemperatureIndex( pickup.pickupable.PrimaryElement.Temperature )
+                 == data.TemperatureIndex( pickup2.pickupable.PrimaryElement.Temperature ) ? 1 : 0;
         }
     }
 
@@ -429,8 +416,7 @@ namespace DeliveryTemperatureLimit
                 // if (num != 0)
                 //    return num;
                 // Append:
-                // num = TemperatureLimit.TemperatureIndex( a.pickupable.PrimaryElement.Temperature )
-                //     .CompareTo( TemperatureLimit.TemperatureIndex( b.pickupable.PrimaryElement.Temperature ));
+                // num = Compare_Hook( a, b );
                 // if (num != 0)
                 //     return num;
                 if( codes[ i ].opcode == OpCodes.Ldarga_S && codes[ i ].operand.ToString() == "2"
@@ -445,40 +431,15 @@ namespace DeliveryTemperatureLimit
                     && CodeInstructionExtensions.IsLdloc( codes[ i + 8 ] )
                     && codes[ i + 9 ].opcode == OpCodes.Ret )
                 {
-                    MethodInfo primaryElement
-                        = AccessTools.Property( typeof( Pickupable ), nameof( Pickupable.PrimaryElement )).GetGetMethod();
-                    MethodInfo temperature
-                        = AccessTools.Property( typeof( PrimaryElement ), nameof( PrimaryElement.Temperature )).GetGetMethod();
                     codes.Insert( i + 10, new CodeInstruction( OpCodes.Ldarg_1 )); // load 'a'
-                    codes.Insert( i + 11, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
-                        nameof( FetchManager.Pickup.pickupable ))); // load 'a.pickupable'
-                    // get 'a.pickupable.PrimaryElement'
-                    codes.Insert( i + 12, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
-                    // get 'a.pickupable.PrimaryElement.Temperature'
-                    codes.Insert( i + 13, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
-                    codes.Insert( i + 14, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
-                        new Type[] { typeof( float ) } ));
-                    // Need to convert to address.
-                    LocalBuilder tmpVar = generator.DeclareLocal( typeof( int ));
-                    codes.Insert( i + 15, /*CodeInstruction.*/StoreLocal( tmpVar.LocalIndex )); // stloc.1
-                    codes.Insert( i + 16, /*CodeInstruction.*/LoadLocal( tmpVar.LocalIndex, true )); // ldloca.s.1
-
-                    codes.Insert( i + 17, new CodeInstruction( OpCodes.Ldarg_2 )); // load 'b'
-                    codes.Insert( i + 18, CodeInstruction.LoadField( typeof( FetchManager.Pickup ),
-                        nameof( FetchManager.Pickup.pickupable ))); // load 'b.pickupable'
-                    // get 'b.pickupable.PrimaryElement'
-                    codes.Insert( i + 19, CodeInstruction.Call( typeof( Pickupable ), primaryElement.Name ));
-                    // get 'b.pickupable.PrimaryElement.Temperature'
-                    codes.Insert( i + 20, CodeInstruction.Call( typeof( PrimaryElement ), temperature.Name ));
-                    codes.Insert( i + 21, CodeInstruction.Call( typeof( TemperatureLimit ), nameof( TemperatureLimit.TemperatureIndex ),
-                        new Type[] { typeof( float ) } ));
-
-                    codes.Insert( i + 22, codes[ i + 4 ].Clone()); // CompareTo()
-                    codes.Insert( i + 23, codes[ i + 5 ].Clone()); // stloc
-                    codes.Insert( i + 24, codes[ i + 6 ].Clone()); // ldloc
-                    codes.Insert( i + 25, codes[ i + 7 ].Clone()); // brfalse
-                    codes.Insert( i + 26, codes[ i + 8 ].Clone()); // ldloc
-                    codes.Insert( i + 27, codes[ i + 9 ].Clone()); // ret
+                    codes.Insert( i + 11, new CodeInstruction( OpCodes.Ldarg_2 )); // load 'b'
+                    codes.Insert( i + 12, new CodeInstruction( OpCodes.Call,
+                        typeof( FetchManager_PickupComparerIncludingPriority_Patch ).GetMethod( nameof( Compare_Hook ))));
+                    codes.Insert( i + 13, codes[ i + 5 ].Clone()); // stloc
+                    codes.Insert( i + 14, codes[ i + 6 ].Clone()); // ldloc
+                    codes.Insert( i + 15, codes[ i + 7 ].Clone()); // brfalse
+                    codes.Insert( i + 16, codes[ i + 8 ].Clone()); // ldloc
+                    codes.Insert( i + 17, codes[ i + 9 ].Clone()); // ret
                     found = true;
                     break;
                 }
@@ -487,6 +448,14 @@ namespace DeliveryTemperatureLimit
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch FetchManager.PickupComparerIncludingPriority.Compare()");
             return codes;
         }
+
+        public static int Compare_Hook( FetchManager.Pickup a, FetchManager.Pickup b )
+        {
+            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            return data.TemperatureIndex( a.pickupable.PrimaryElement.Temperature )
+                .CompareTo( data.TemperatureIndex( b.pickupable.PrimaryElement.Temperature ));
+        }
+
 // ONI's Harmony is too old to have LocalLocal() and StoreLocal(), so copy&paste from Harmony.
 /*
 MIT License

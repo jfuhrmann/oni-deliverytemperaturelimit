@@ -150,7 +150,8 @@ namespace DeliveryTemperatureLimit
             TemperatureLimit limit = TemperatureLimit.Get( errand.Destination?.gameObject );
             if( limit == null || limit.IsDisabled())
                 return;
-            ( int lowIndex, int highIndex ) = limit.TemperatureIndexes();
+            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            ( int lowIndex, int highIndex ) = data.TemperatureIndexes( limit );
             float total = 0;
             // This should already include also sub-worlds, so only sum up amounts
             // for all indexes included in the range.
@@ -318,15 +319,17 @@ namespace DeliveryTemperatureLimit
                 currentAmounts = new AmountByTagIndexDict();
                 worldAmounts[ worldId ] = currentAmounts;
             }
-            int maxTemperatureIndex = TemperatureLimit.MaxTemperatureIndex();
-            for( int i = 0; i <= maxTemperatureIndex; ++i )
+            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            for( int i = 0; i <= data.MaxTemperatureIndex(); ++i )
                 currentAmounts[ ( key, i ) ] = 0;
         }
 
         public static void UpdateInventory( Pickupable item, Tag key )
         {
-            if( item.PrimaryElement != null )
-                currentAmounts[ ( key, TemperatureLimit.TemperatureIndex( item.PrimaryElement.Temperature )) ] += item.TotalAmount;
+            if( item.PrimaryElement == null )
+                return;
+            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            currentAmounts[ ( key, data.TemperatureIndex( item.PrimaryElement.Temperature )) ] += item.TotalAmount;
         }
     }
 }

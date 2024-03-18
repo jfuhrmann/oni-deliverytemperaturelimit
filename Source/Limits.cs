@@ -126,13 +126,61 @@ namespace DeliveryTemperatureLimit
         private static object lockObject = new object();
         private static List< TemperatureLimit > allLimits = new List< TemperatureLimit >();
         private volatile static bool limitsDirty = true;
-        // A list of temperature values where groups end (in the example above, this would
-        // be { 10, 20, 30, max }.
-        private static List< int > indexTemperatures;
-        // The inverse of indexTemperatures. There are only 5000 (MinValue <= t < MaxValue) integer
-        // temperatures, and TemperatureIndex() seems to be called for hot code, so replace
-        // lookup in a loop with O(1) indexing.
-        private static System.Int16[] temperaturesToIndex;
+        // The temperature index data that are updated and used publicly. They are in one object
+        // so that they are atomically updated together. Code reading them should get a reference
+        // to the object and then use that for all operations.
+        public class TemperatureIndexData
+        {
+            // A list of temperature values where groups end (in the example above, this would
+            // be { 10, 20, 30, max }.
+            private List< int > indexTemperatures;
+            public List< int > IndexTemperatures { get; }
+            // The inverse of indexTemperatures. There are only 5000 (MinValue <= t < MaxValue) integer
+            // temperatures, and TemperatureIndex() seems to be called for hot code, so replace
+            // lookup in a loop with O(1) indexing.
+            private System.Int16[] temperaturesToIndex;
+
+            public TemperatureIndexData( List< int > indexTemperatures, System.Int16[] temperaturesToIndex )
+            {
+                this.indexTemperatures = indexTemperatures;
+                this.temperaturesToIndex = temperaturesToIndex;
+            }
+
+            public int TemperatureIndex( float temperature )
+            {
+                if( temperature >= MinValue && temperature < MaxValue )
+                    return temperaturesToIndex[ (int) temperature ];
+                return -1;
+            }
+
+            public int MaxTemperatureIndex()
+            {
+                return indexTemperatures.Count - 1;
+            }
+
+
+            // The range end is exclusive.
+            public (int, int) TemperatureIndexes( TemperatureLimit limit )
+            {
+                if( limitsDirty )
+                    UpdateIndexes();
+                // MaxValue is actually beyond indexes (there can't be any index after it),
+                // so handle that.
+                int highIndex = indexTemperatures.Count; // one beyond last
+                if( limit.highLimit != MaxValue )
+                    highIndex = temperaturesToIndex[ limit.highLimit ];
+                return ( temperaturesToIndex[ limit.lowLimit ], highIndex );
+            }
+        };
+
+        private static TemperatureIndexData temperatureIndexData;
+
+        public static TemperatureIndexData getTemperatureIndexData()
+        {
+            if( limitsDirty )
+                UpdateIndexes();
+            return temperatureIndexData;
+        }
 
         private static void SetDirty()
         {
@@ -148,6 +196,7 @@ namespace DeliveryTemperatureLimit
             {
                 if( !limitsDirty )
                     return;
+                limitsDirty = false;
                 List< int > tmp = new List< int >();
                 tmp.Add( TemperatureLimit.MaxValue );
                 foreach( TemperatureLimit limit in allLimits )
@@ -160,7 +209,7 @@ namespace DeliveryTemperatureLimit
                 }
                 tmp.Sort();
                 tmp = tmp.Distinct().ToList();
-                if( !tmp.Equals( indexTemperatures ))
+                if( temperatureIndexData == null || !tmp.Equals( temperatureIndexData.IndexTemperatures ))
                 {
                     System.Int16[] newTemperaturesToIndex = new System.Int16[ MaxValue - MinValue ];
                     int pos = 0;
@@ -170,40 +219,10 @@ namespace DeliveryTemperatureLimit
                         while( pos < value )
                             newTemperaturesToIndex[ pos++ ] = i;
                     }
-                    Interlocked.Exchange( ref indexTemperatures, tmp );
-                    Interlocked.Exchange( ref temperaturesToIndex, newTemperaturesToIndex );
+                    // Change the reference, which is atomic in C#.
+                    temperatureIndexData = new TemperatureIndexData( tmp, newTemperaturesToIndex );
                 }
-                limitsDirty = false;
             }
-        }
-
-        public static int TemperatureIndex( float temperature )
-        {
-            if( limitsDirty )
-                UpdateIndexes();
-            if( temperature >= MinValue && temperature < MaxValue )
-                return temperaturesToIndex[ (int) temperature ];
-            return -1;
-        }
-
-        public static int MaxTemperatureIndex()
-        {
-            if( limitsDirty )
-                UpdateIndexes();
-            return indexTemperatures.Count - 1;
-        }
-
-        // The range end is exclusive.
-        public (int, int) TemperatureIndexes()
-        {
-            if( limitsDirty )
-                UpdateIndexes();
-            // MaxValue is actually beyond indexes (there can't be any index after it),
-            // so handle that.
-            int highIndex = indexTemperatures.Count; // one beyond last
-            if( highLimit != MaxValue )
-                highIndex = temperaturesToIndex[ highLimit ];
-            return ( temperaturesToIndex[ lowLimit ], highIndex );
         }
     }
 }

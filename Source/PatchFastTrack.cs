@@ -132,7 +132,8 @@ namespace DeliveryTemperatureLimit
             // the dictionary key distinct. The key is not used for anything else than dictionary access, so this
             // should be ok.
             int num = hash;
-            int index = TemperatureLimit.TemperatureIndex( pickupable.PrimaryElement.Temperature );
+            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            int index = data.TemperatureIndex( pickupable.PrimaryElement.Temperature );
             // The tagBitsHash value originally comes from Tag.GetHashCode(), and the Tag class uses Hash.SDBMLower().
             // This line is basically the line that computes Hash.SDBMLower(), so the temperature index should act
             // as another "character". Hopefully using the same hash code makes it extremely unlikely that
