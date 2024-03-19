@@ -224,5 +224,14 @@ namespace DeliveryTemperatureLimit
                 }
             }
         }
+
+        protected override void OnLoadLevel()
+        {
+            // It appears that re-loading a save does not properly clean up objects, clean up.
+            base.OnLoadLevel();
+            fastMap.Clear();
+            allLimits.Clear();
+            SetDirty();
+        }
     }
 }
