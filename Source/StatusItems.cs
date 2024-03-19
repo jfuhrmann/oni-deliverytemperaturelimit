@@ -37,23 +37,32 @@ namespace DeliveryTemperatureLimit
 
             MethodInfo infoWorldInventoryUpdate = AccessTools.Method( "WorldInventory:Update" );
             if( infoWorldInventoryUpdate != null )
-                harmony.Patch( infoWorldInventoryUpdate, transpiler: new HarmonyMethod(
-                    typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( WorldInventoryUpdate ))));
+                harmony.Patch( infoWorldInventoryUpdate,
+                    transpiler: new HarmonyMethod( typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( WorldInventoryUpdate ))),
+                    postfix: new HarmonyMethod( typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( WorldInventoryUpdate_Postfix ))));
             else
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to find WorldInventory.Update().");
 
+            MethodInfo infoStartUpdateAll = AccessTools.Method(
+                "PeterHan.FastTrack.UIPatches.BackgroundInventoryUpdater:StartUpdateAll" );
             MethodInfo infoRunUpdate = AccessTools.Method(
                 "PeterHan.FastTrack.UIPatches.BackgroundWorldInventory:RunUpdate" );
             MethodInfo infoSumTotal = AccessTools.Method(
                 "PeterHan.FastTrack.UIPatches.BackgroundWorldInventory:SumTotal" );
-            if( infoRunUpdate != null && infoSumTotal != null )
+            if( infoStartUpdateAll != null && infoRunUpdate != null && infoSumTotal != null )
             {
-                harmony.Patch( infoRunUpdate, transpiler: new HarmonyMethod(
-                    typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( RunUpdate ))));
+                harmony.Patch( infoStartUpdateAll, prefix: new HarmonyMethod(
+                    typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( StartUpdateAll_Prefix ))));
+                harmony.Patch( infoRunUpdate,
+                    transpiler: new HarmonyMethod( typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( RunUpdate ))),
+                    postfix: new HarmonyMethod( typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( RunUpdate_Postfix ))));
                 harmony.Patch( infoSumTotal, transpiler: new HarmonyMethod(
                     typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( SumTotal ))));
             }
         }
+
+        // Keeping track of amounts for each world+tag+temperature combo.
+        private static Dictionary< int, AmountByTagIndexDict > worldAmounts = new Dictionary< int, AmountByTagIndexDict >();
 
         // Game's FetchListStatusItemUpdater.Render200ms().
         public static IEnumerable<CodeInstruction> Render200ms(IEnumerable<CodeInstruction> instructions)
@@ -183,6 +192,7 @@ namespace DeliveryTemperatureLimit
             var codes = new List<CodeInstruction>(instructions);
             bool found1 = false;
             bool found2 = false;
+            bool found3 = false;
             for( int i = 0; i < codes.Count; ++i )
             {
                 // Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
@@ -203,97 +213,216 @@ namespace DeliveryTemperatureLimit
                 // The function has code:
                 // num3 += item.TotalAmount;
                 // Append:
-                // WorldInventoryUpdate_Hook2( item, key );
+                // WorldInventoryUpdate_Hook2( item );
                 if( codes[ i ].opcode == OpCodes.Ldloc_S && codes[ i ].operand.ToString() == "Pickupable (7)"
                     && i + 1 < codes.Count
                     && codes[ i + 1 ].opcode == OpCodes.Callvirt && codes[ i + 1 ].operand.ToString() == "Single get_TotalAmount()" )
                 {
                     codes.Insert( i + 1, new CodeInstruction( OpCodes.Dup )); // create a copy of 'item'
-                    codes.Insert( i + 2, new CodeInstruction( OpCodes.Ldloc_S, 4 )); // load 'key'
-                    codes.Insert( i + 3, new CodeInstruction( OpCodes.Call,
+                    codes.Insert( i + 2, new CodeInstruction( OpCodes.Call,
                         typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( WorldInventoryUpdate_Hook2 ))));
                     found2 = true;
-                    break;
+                }
+                // The function has code:
+                // accessibleAmounts[key] = num3;
+                // Append:
+                // WorldInventoryUpdate_Hook3( key, num2 );
+                if( codes[ i ].opcode == OpCodes.Ldfld && codes[ i ].operand.ToString().EndsWith( " accessibleAmounts" ))
+                {
+                    codes.Insert( i + 1, new CodeInstruction( OpCodes.Ldloc_S, 4 )); // load 'key'
+                    codes.Insert( i + 2, new CodeInstruction( OpCodes.Ldloc_2, 4 )); // load 'num2'
+                    codes.Insert( i + 3, new CodeInstruction( OpCodes.Call,
+                        typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( WorldInventoryUpdate_Hook3 ))));
+                    found3 = true;
                 }
             }
-            if(!found1 || !found2)
+            if(!found1 || !found2 || !found3)
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch WorldInventory.Update()");
             return codes;
         }
 
+        // WorldInventory.Update() runs in a single thread, so simply use statics for data.
+        private static float[] updateSums;
+        private static TemperatureLimit.TemperatureIndexData updateIndexData;
+
         public static void WorldInventoryUpdate_Hook1( int worldId, Tag key )
         {
-            InitializeInventory( worldId, key );
+            updateIndexData = TemperatureLimit.getTemperatureIndexData();
+            if( updateSums == null || updateSums.Length != updateIndexData.TemperatureIndexCount())
+                updateSums = new float[ updateIndexData.TemperatureIndexCount() ];
+            Array.Clear( updateSums, 0, updateSums.Length ); // set all elements to 0
         }
 
-        public static void WorldInventoryUpdate_Hook2( Pickupable item, Tag key )
+        public static void WorldInventoryUpdate_Hook2( Pickupable item )
         {
-            UpdateInventory( item, key );
+            if( item.PrimaryElement == null )
+                return;
+            updateSums[ updateIndexData.TemperatureIndex( item.PrimaryElement.Temperature ) ] += item.TotalAmount;
         }
 
-        // FastTrack's world inventory code. RunUpdate() calls into SumTotal() for each world+tag combo.
+        public static void WorldInventoryUpdate_Hook3( Tag key, int worldId )
+        {
+            if( !worldAmounts.TryGetValue( worldId, out AmountByTagIndexDict amounts ))
+            {
+                amounts = new AmountByTagIndexDict();
+                worldAmounts[ worldId ] = amounts;
+            }
+            for( int i = 0; i < updateSums.Length; ++i )
+                amounts[ ( key, i ) ] = updateSums[ i ];
+        }
+
+        public static void WorldInventoryUpdate_Postfix()
+        {
+            updateIndexData = null;
+        }
+
+        // FastTrack's world inventory code. StartUpdateAll() starts running RunUpdate() in threads, and RunUpdate()
+        // calls into SumTotal() for each world+tag combo.
+        // This needs to be thread-safe. For this reason, the setup is that StartUpdateAll() ensures worldAmounts()
+        // has the proper dictionary entry for all worlds, so that the shared dictionary (itself) is not modified in a thread.
+        // RunUpdate() will update the relevant dictionary entry item for its world.
+        public static void StartUpdateAll_Prefix()
+        {
+            var inst = ClusterManager.Instance;
+            /*var jm = AsyncJobManager.Instance;*/
+            if (!SpeedControlScreen.Instance.IsPaused/* && FastTrackMod.GameRunning && inst != null && jm != null*/)
+            {
+                var worlds = inst.WorldContainers;
+                foreach (var container in worlds)
+                {
+                    int worldId = container.id;
+                    // We use a dictionary to store per-world data, so make sure the dictionary has an item
+                    // for each world, so that the dictionary itself is not modified in threads, only its items will be.
+                    // TODO: Maybe do this when world is added/removed?
+                    if( worldId >= 0 && worldId != ClusterManager.INVALID_WORLD_IDX )
+                    {
+                        if( !worldAmounts.ContainsKey( worldId ))
+                            worldAmounts[ worldId ] = new AmountByTagIndexDict();
+                    }
+                }
+            }
+        }
+
         public static IEnumerable<CodeInstruction> RunUpdate(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
         {
             var codes = new List<CodeInstruction>(instructions);
-            int foundCount = 0;
+            bool found1 = false;
+            int found2Count = 0;
+            LocalBuilder localAmounts = null;
             for( int i = 0; i < codes.Count; ++i )
             {
                 // Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                // The function has code:
+                // ui = updateIndex
+                // Append:
+                // AmountByTagIndexDict amounts = RunUpdate_Hook1( worldId );
+                if( codes[ i ].opcode == OpCodes.Ldarg_0
+                    && i + 2 < codes.Count
+                    && codes[ i + 1 ].opcode == OpCodes.Ldfld && codes[ i + 1 ].operand.ToString() == "System.Int32 updateIndex"
+                    && codes[ i + 2 ].opcode == OpCodes.Stloc_S )
+                {
+                    codes.Insert( i + 3, new CodeInstruction( OpCodes.Ldloc_0 )); // load 'worldId'
+                    codes.Insert( i + 4, new CodeInstruction( OpCodes.Call,
+                        typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( RunUpdate_Hook1 ))));
+                    localAmounts = generator.DeclareLocal( typeof( AmountByTagIndexDict ));
+                    codes.Insert( i + 5, new CodeInstruction( OpCodes.Stloc_S, localAmounts.LocalIndex )); // store 'amounts'
+                    found1 = true;
+                }
                 // The function has code (two times):
                 // accessibleAmounts[pair.Key] = SumTotal(pair.Value, worldId);
-                // Prepend:
-                // RunUpdate_Hook( pair.Key, worldId );
-                if( codes[ i ].opcode == OpCodes.Ldloc_0
-                    && i + 1 < codes.Count
-                    && codes[ i + 1 ].opcode == OpCodes.Call
-                    && codes[ i + 1 ].operand.ToString() == "Single SumTotal(System.Collections.Generic.IEnumerable`1[Pickupable], Int32)" )
+                // And append:
+                // RunUpdate_Hook2( pair.Key, amounts );
+                if( found1 && codes[ i ].opcode == OpCodes.Call
+                    && codes[ i ].operand.ToString() == "Tag get_Key()"
+                    && codes[ i + 3 ].opcode == OpCodes.Ldloc_0
+                    && i + 4 < codes.Count
+                    && codes[ i + 4 ].opcode == OpCodes.Call
+                    && codes[ i + 4 ].operand.ToString() == "Single SumTotal(System.Collections.Generic.IEnumerable`1[Pickupable], Int32)" )
                 {
-                    // Both pair.Key and pair.Value are already on the stack, and so getting to pair.Key
-                    // requires popping pair.Value and saving it.
-                    LocalBuilder localValue = generator.DeclareLocal( typeof( Dictionary<Tag, HashSet<Pickupable>> ));
-                    codes.Insert( i, new CodeInstruction( OpCodes.Stloc_S, localValue.LocalIndex )); // store 'pair.Value'
-                    codes.Insert( i + 1, new CodeInstruction( OpCodes.Dup )); // create a copy of 'pair.Key'
-                    codes.Insert( i + 2, codes[ i + 2 ].Clone()); // load 'worldId'
-                    codes.Insert( i + 3, new CodeInstruction( OpCodes.Call,
-                        typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( RunUpdate_Hook ))));
-                    // Now 'pair.Key' is still on the stack, load 'pair.Value', and 'worldId' will be loaded by the original code.
-                    codes.Insert( i + 4, new CodeInstruction( OpCodes.Ldloc_S, localValue.LocalIndex ));
-                    ++foundCount;
-                    i = i + 5; // Move past the generated code to the first original instruction in order to avoid an infinite loop.
+                    // Right after calling SumTotal() and before the Dictionary operator [] is called,
+                    // the stack contains 'accessibleAmounts', 'pair.Key' and the return value of SumTotal().
+                    // Duplicate 'pair.Key', add 'amounts', call the hook function, and it'll return the passed
+                    // SumTotal() result so that the stack is in the same state again.
+                    codes.Insert( i + 1, new CodeInstruction( OpCodes.Dup )); // duplicate 'pair.Key'
+                    codes.Insert( i + 1 + 5, new CodeInstruction( OpCodes.Ldloc_S, localAmounts.LocalIndex )); // load 'amounts'
+                    codes.Insert( i + 1 + 6, new CodeInstruction( OpCodes.Call,
+                        typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( RunUpdate_Hook2 ))));
+                    ++found2Count;
                 }
             }
-            if( foundCount != 2 )
+            if( !found1 || found2Count != 2 )
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch BackgroundWorldInventory.RunUpdate()");
             return codes;
         }
 
-        // The code is in a thread, but it itself is running as a single thread, so static should be fine.
-        private static Tag currentKey;
-
-        public static void RunUpdate_Hook( Tag key, int worldId )
+        // We'd need to add another parameter to SumTotals(), which AFAIK cannot be done. So instead
+        // use a static variable to pass totals per temperature index, and since this runs in threads,
+        // it has to be thread-local.
+        public class SumTotalData
         {
-            currentKey = key;
-            InitializeInventory( worldId, key );
+            public float[] sumTotals;
+            public TemperatureLimit.TemperatureIndexData indexData;
+        };
+
+        [ThreadStatic]
+        private static SumTotalData sumTotalData;
+
+        public static AmountByTagIndexDict RunUpdate_Hook1( int worldId )
+        {
+            // Prepare the floats array where to store sums per temperature index.
+            SumTotalData data = sumTotalData;
+            if( data == null )
+                data = sumTotalData = new SumTotalData();
+            data.indexData = TemperatureLimit.getTemperatureIndexData();
+            if( data.sumTotals == null || data.sumTotals.Length != data.indexData.TemperatureIndexCount())
+                data.sumTotals = new float[ data.indexData.TemperatureIndexCount() ];
+            Array.Clear( data.sumTotals, 0, data.sumTotals.Length ); // set all elements to 0
+            // Return the AmountByTagIndexDict for this world to use in this thread.
+            return worldAmounts[ worldId ];
         }
 
-        public static IEnumerable<CodeInstruction> SumTotal(IEnumerable<CodeInstruction> instructions)
+        public static float RunUpdate_Hook2( Tag key, float sumTotalResult, AmountByTagIndexDict amounts )
+        {
+            // The sum totals needed to be calculated in separate array (so that worldAmounts dictionary
+            // does not contain work-in-progress sums that could be meanwhile read by the main thread),
+            // and now only write the totals.
+            SumTotalData data = sumTotalData;
+            for( int i = 0; i < data.sumTotals.Length; ++i )
+                amounts[ ( key, i ) ] = data.sumTotals[ i ];
+            return sumTotalResult;
+        }
+
+        public static void RunUpdate_Postfix()
+        {
+            updateIndexData = null;
+        }
+
+        public static IEnumerable<CodeInstruction> SumTotal(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
         {
             var codes = new List<CodeInstruction>(instructions);
             bool found = false;
+            // I don't know the compiler will be smart enough to optimize the TLS access, so cache the variable.
+            // At the very beginning of the function, add:
+            // SumTotalData data = SumTotal_Hook1();
+            codes.Insert( 0, new CodeInstruction( OpCodes.Call,
+                typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( SumTotal_Hook1 ))));
+            LocalBuilder localSumTotalData = generator.DeclareLocal( typeof( SumTotalData ));
+            codes.Insert( 1, new CodeInstruction( OpCodes.Stloc_S, localSumTotalData.LocalIndex )); // store 'data'
             for( int i = 0; i < codes.Count; ++i )
             {
                 // Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
                 // The function has code (two times):
                 // total += pickupable.TotalAmount;
                 // Append:
-                // SumTotal_Hook( pickupable );
+                // SumTotal_Hook2( pickupable, data );
                 if( codes[ i ].opcode == OpCodes.Ldloc_S && codes[ i ].operand.ToString() == "Pickupable (4)"
                     && i + 1 < codes.Count
                     && codes[ i + 1 ].opcode == OpCodes.Callvirt && codes[ i + 1 ].operand.ToString() == "Single get_TotalAmount()" )
                 {
                     codes.Insert( i + 1, new CodeInstruction( OpCodes.Dup )); // create a copy of 'pickupable'
-                    codes.Insert( i + 2, new CodeInstruction( OpCodes.Call,
-                        typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( SumTotal_Hook ))));
+                    codes.Insert( i + 2, new CodeInstruction( OpCodes.Ldloc_S, localSumTotalData.LocalIndex )); // load 'data'
+                    codes.Insert( i + 3, new CodeInstruction( OpCodes.Call,
+                        typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( SumTotal_Hook2 ))));
                     found = true;
                     break;
                 }
@@ -303,33 +432,16 @@ namespace DeliveryTemperatureLimit
             return codes;
         }
 
-        public static void SumTotal_Hook( Pickupable pickupable )
+        public static SumTotalData SumTotal_Hook1()
         {
-            UpdateInventory( pickupable, currentKey );
+            return sumTotalData;
         }
 
-        // Shared code for keeping track of amounts for each world+tag+temperature combo.
-        private static Dictionary< int, AmountByTagIndexDict > worldAmounts = new Dictionary< int, AmountByTagIndexDict >();
-        private static AmountByTagIndexDict currentAmounts;
-
-        public static void InitializeInventory( int worldId, Tag key )
+        public static void SumTotal_Hook2( Pickupable pickupable, SumTotalData data )
         {
-            if( !worldAmounts.TryGetValue( worldId, out currentAmounts ))
-            {
-                currentAmounts = new AmountByTagIndexDict();
-                worldAmounts[ worldId ] = currentAmounts;
-            }
-            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
-            for( int i = 0; i <= data.MaxTemperatureIndex(); ++i )
-                currentAmounts[ ( key, i ) ] = 0;
-        }
-
-        public static void UpdateInventory( Pickupable item, Tag key )
-        {
-            if( item.PrimaryElement == null )
+            if( pickupable.PrimaryElement == null )
                 return;
-            TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
-            currentAmounts[ ( key, data.TemperatureIndex( item.PrimaryElement.Temperature )) ] += item.TotalAmount;
+            data.sumTotals[ data.indexData.TemperatureIndex( pickupable.PrimaryElement.Temperature ) ] += pickupable.TotalAmount;
         }
     }
 }

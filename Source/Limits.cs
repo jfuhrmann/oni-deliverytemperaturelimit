@@ -153,9 +153,9 @@ namespace DeliveryTemperatureLimit
                 return -1;
             }
 
-            public int MaxTemperatureIndex()
+            public int TemperatureIndexCount()
             {
-                return indexTemperatures.Count - 1;
+                return indexTemperatures.Count;
             }
 
 
