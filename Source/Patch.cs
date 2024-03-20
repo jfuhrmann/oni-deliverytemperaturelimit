@@ -31,10 +31,13 @@ namespace DeliveryTemperatureLimit
     {
         public static void Patch( Harmony harmony )
         {
-            MethodInfo info = AccessTools.Method( "ClearableManager:CollectChores" );
+            MethodInfo info = AccessTools.Method( typeof( KMod.Mod ).Assembly.GetType( "ClearableManager" ), "CollectChores" );
             if( info != null )
                 harmony.Patch( info, transpiler: new HarmonyMethod(
                     typeof( ClearableManager_Patch ).GetMethod( nameof( CollectChores ))));
+            else
+                Debug.LogError( "DeliveryTemperatureLimit: Failed to find"
+                    + " ClearableManager.CollectChores() for patching" );
         }
 
         public static IEnumerable<CodeInstruction> CollectChores(IEnumerable<CodeInstruction> instructions)
@@ -342,9 +345,9 @@ namespace DeliveryTemperatureLimit
         // The class is private, so patch manually.
         public static void Patch( Harmony harmony )
         {
-            MethodInfo info = AccessTools.Method( "FetchManager.PickupComparerIncludingPriority:Compare");
-            if( info == null ) // For some reason the name has to use '+' instead of '.' for the private class.
-                info = AccessTools.Method( "FetchManager+PickupComparerIncludingPriority:Compare");
+            MethodInfo info = AccessTools.Method(
+                typeof( FetchManager ).GetNestedType( "PickupComparerIncludingPriority", BindingFlags.NonPublic ),
+                "Compare");
             if( info != null )
                 harmony.Patch( info, transpiler: new HarmonyMethod(
                     typeof( FetchManager_PickupComparerIncludingPriority_Patch ).GetMethod( nameof( Compare ))));

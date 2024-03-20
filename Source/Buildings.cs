@@ -1,5 +1,6 @@
 using HarmonyLib;
 using UnityEngine;
+using System;
 using System.Reflection;
 
 namespace DeliveryTemperatureLimit
@@ -9,93 +10,93 @@ namespace DeliveryTemperatureLimit
     {
         public static void Patch( Harmony harmony )
         {
-            string[] configs =
+            Type[] configTypes =
             {
-               nameof(StorageLockerSmartConfig),
-               nameof(StorageLockerConfig),
-               nameof(ObjectDispenserConfig),
-               nameof(OrbitalCargoModuleConfig),
-               nameof(SolidConduitInboxConfig),
-               nameof(BottleEmptierConfig),
-               nameof(BottleEmptierGasConfig),
-               nameof(CreatureFeederConfig),
-               nameof(PlanterBoxConfig),
-               nameof(FarmTileConfig),
-               nameof(HydroponicFarmConfig),
-               nameof(AirFilterConfig),
-               nameof(WaterPurifierConfig),
-               nameof(RockCrusherConfig),
-               nameof(OuthouseConfig),
-               nameof(SludgePressConfig),
-               nameof(SuitFabricatorConfig),
-               nameof(MetalRefineryConfig),
-               nameof(GlassForgeConfig),
-               nameof(SublimationStationConfig),
-               nameof(LonelyMinionHouseConfig),
-               nameof(ResearchCenterConfig),
+               typeof(StorageLockerSmartConfig),
+               typeof(StorageLockerConfig),
+               typeof(ObjectDispenserConfig),
+               typeof(OrbitalCargoModuleConfig),
+               typeof(SolidConduitInboxConfig),
+               typeof(BottleEmptierConfig),
+               typeof(BottleEmptierGasConfig),
+               typeof(CreatureFeederConfig),
+               typeof(PlanterBoxConfig),
+               typeof(FarmTileConfig),
+               typeof(HydroponicFarmConfig),
+               typeof(AirFilterConfig),
+               typeof(WaterPurifierConfig),
+               typeof(RockCrusherConfig),
+               typeof(OuthouseConfig),
+               typeof(SludgePressConfig),
+               typeof(SuitFabricatorConfig),
+               typeof(MetalRefineryConfig),
+               typeof(GlassForgeConfig),
+               typeof(SublimationStationConfig),
+               typeof(LonelyMinionHouseConfig),
+               typeof(ResearchCenterConfig),
 #if false
-               nameof(WaterCoolerConfig),
-               nameof(JuicerConfig),
-               nameof(AlgaeHabitatConfig),
-               nameof(WoodGasGeneratorConfig),
-               nameof(AdvancedResearchCenterConfig),
-               nameof(RustDeoxidizerConfig),
-               nameof(MechanicalSurfboardConfig),
-               nameof(IceMachineConfig),
-               nameof(WashBasinConfig),
-               nameof(FarmStationConfig),
-               nameof(EspressoMachineConfig),
-               nameof(SodaFountainConfig),
-               nameof(CompostConfig),
-               nameof(AlgaeDistilleryConfig),
-               nameof(OxyliteRefineryConfig),
-               nameof(MineralDeoxidizerConfig),
-               nameof(HandSanitizerConfig),
-               nameof(FertilizerMakerConfig),
-               nameof(DiningTableConfig),
+               typeof(WaterCoolerConfig),
+               typeof(JuicerConfig),
+               typeof(AlgaeHabitatConfig),
+               typeof(WoodGasGeneratorConfig),
+               typeof(AdvancedResearchCenterConfig),
+               typeof(RustDeoxidizerConfig),
+               typeof(MechanicalSurfboardConfig),
+               typeof(IceMachineConfig),
+               typeof(WashBasinConfig),
+               typeof(FarmStationConfig),
+               typeof(EspressoMachineConfig),
+               typeof(SodaFountainConfig),
+               typeof(CompostConfig),
+               typeof(AlgaeDistilleryConfig),
+               typeof(OxyliteRefineryConfig),
+               typeof(MineralDeoxidizerConfig),
+               typeof(HandSanitizerConfig),
+               typeof(FertilizerMakerConfig),
+               typeof(DiningTableConfig),
 
-               nameof(MicrobeMusherConfig),
-               nameof(ClothingFabricatorConfig),
-               nameof(ManualHighEnergyParticleSpawnerConfig),
-               nameof(OrbitalResearchCenterConfig),
-               nameof(CraftingTableConfig),
-               nameof(DiamondPressConfig),
-               nameof(ApothecaryConfig),
-               nameof(EggCrackerConfig),
-               nameof(FossilDigSiteConfig),
-               nameof(ClothingAlterationStationConfig),
-               nameof(AdvancedApothecaryConfig),
-               nameof(GenericFabricatorConfig),
-               nameof(GourmetCookingStationConfig),
-               nameof(CookingStationConfig),
-               nameof(SupermaterialRefineryConfig),
-               nameof(MissileFabricatorConfig),
-               nameof(UraniumCentrifugeConfig),
-               nameof(KilnConfig),
+               typeof(MicrobeMusherConfig),
+               typeof(ClothingFabricatorConfig),
+               typeof(ManualHighEnergyParticleSpawnerConfig),
+               typeof(OrbitalResearchCenterConfig),
+               typeof(CraftingTableConfig),
+               typeof(DiamondPressConfig),
+               typeof(ApothecaryConfig),
+               typeof(EggCrackerConfig),
+               typeof(FossilDigSiteConfig),
+               typeof(ClothingAlterationStationConfig),
+               typeof(AdvancedApothecaryConfig),
+               typeof(GenericFabricatorConfig),
+               typeof(GourmetCookingStationConfig),
+               typeof(CookingStationConfig),
+               typeof(SupermaterialRefineryConfig),
+               typeof(MissileFabricatorConfig),
+               typeof(UraniumCentrifugeConfig),
+               typeof(KilnConfig),
 #endif
             };
-            foreach( string config in configs )
+            foreach( Type configType in configTypes )
             {
-                MethodInfo info = AccessTools.Method( config + ":DoPostConfigureComplete");
+                MethodInfo info = AccessTools.Method( configType, "DoPostConfigureComplete");
                 // HACK: Using prefix, postfix or finalizer randomly(?) makes the game crash,
                 // probably a Harmony bug (even enabling 'Harmony.DEBUG = true;' avoids
                 // the problem ). Use whatever seems to work.
                 if( info != null )
                     harmony.Patch( info, postfix: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
                 else
-                    Debug.LogError( "DeliveryTemperatureLimit: Failed to patch DoPostConfigureComplete() for " + config );
+                    Debug.LogError( "DeliveryTemperatureLimit: Failed to patch DoPostConfigureComplete() for " + configType.Name );
             }
 
-            string[] methods =
+            string[] configTypeStrings =
             {
                 // Move This Here
-                "MoveThisHere.HaulingPointConfig",
+                "MoveThisHere.HaulingPointConfig, MoveThisHere",
                 // Storage Pod
-                "StoragePod.StoragePodConfig",
+                "StoragePod.StoragePodConfig, Storage Pod",
             };
-            foreach( string method in methods )
+            foreach( string configType in configTypeStrings )
             {
-                MethodInfo info = AccessTools.Method( method + ":DoPostConfigureComplete");
+                MethodInfo info = AccessTools.Method( Type.GetType( configType ), "DoPostConfigureComplete");
                 if( info != null )
                     harmony.Patch( info, postfix: new HarmonyMethod( typeof( Buildings_Patch ).GetMethod( "DoPostConfigureComplete" )));
             }

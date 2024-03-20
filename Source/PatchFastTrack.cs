@@ -1,4 +1,5 @@
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -10,7 +11,9 @@ namespace DeliveryTemperatureLimit
     {
         public static void Patch( Harmony harmony )
         {
-            MethodInfo info = AccessTools.Method( "PeterHan.FastTrack.GamePatches.ChoreComparator:CheckFetchChore" );
+            MethodInfo info = AccessTools.Method(
+                Type.GetType( "PeterHan.FastTrack.GamePatches.ChoreComparator, FastTrack" ),
+                "CheckFetchChore" );
             if( info != null )
                 harmony.Patch( info, transpiler: new HarmonyMethod(
                     typeof( ChoreComparator_Patch ).GetMethod( nameof( CheckFetchChore ))));
@@ -84,7 +87,9 @@ namespace DeliveryTemperatureLimit
     {
         public static void Patch( Harmony harmony )
         {
-            MethodInfo info = AccessTools.Method( "PeterHan.FastTrack.GamePatches.FetchManagerFastUpdate+PickupTagDict:AddItem" );
+            MethodInfo info = AccessTools.Method(
+                Type.GetType( "PeterHan.FastTrack.GamePatches.FetchManagerFastUpdate+PickupTagDict, FastTrack" ),
+                "AddItem" );
             if( info != null )
                 harmony.Patch( info, transpiler: new HarmonyMethod(
                     typeof( FetchManagerFastUpdate_PickupTagDict_Patch ).GetMethod( nameof( AddItem ))));

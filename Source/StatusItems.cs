@@ -21,8 +21,7 @@ namespace DeliveryTemperatureLimit
             if( !Options.Instance.CheckTemperatureForStatusItems )
                 return;
 
-            MethodInfo infoRender200ms = AccessTools.Method(
-                "FetchListStatusItemUpdater:Render200ms" );
+            MethodInfo infoRender200ms = AccessTools.Method( typeof( FetchListStatusItemUpdater ), "Render200ms" );
             if( infoRender200ms != null )
                 harmony.Patch( infoRender200ms,
                     transpiler: new HarmonyMethod( typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( Render200ms ))));
@@ -30,12 +29,13 @@ namespace DeliveryTemperatureLimit
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to find FetchListStatusItemUpdater.Render200ms().");
 
             MethodInfo infoUpdateStatus = AccessTools.Method(
-                "PeterHan.FastTrack.GamePatches.FetchListStatusItemUpdater_Render200ms_Patch:UpdateStatus" );
+                Type.GetType( "PeterHan.FastTrack.GamePatches.FetchListStatusItemUpdater_Render200ms_Patch, FastTrack" ),
+                "UpdateStatus" );
             if( infoUpdateStatus != null )
                 harmony.Patch( infoUpdateStatus, transpiler: new HarmonyMethod(
                     typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( UpdateStatus ))));
 
-            MethodInfo infoWorldInventoryUpdate = AccessTools.Method( "WorldInventory:Update" );
+            MethodInfo infoWorldInventoryUpdate = AccessTools.Method( typeof( WorldInventory ), "Update" );
             if( infoWorldInventoryUpdate != null )
                 harmony.Patch( infoWorldInventoryUpdate,
                     transpiler: new HarmonyMethod( typeof( StatusItemsUpdaterPatch ).GetMethod( nameof( WorldInventoryUpdate ))),
@@ -44,11 +44,14 @@ namespace DeliveryTemperatureLimit
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to find WorldInventory.Update().");
 
             MethodInfo infoStartUpdateAll = AccessTools.Method(
-                "PeterHan.FastTrack.UIPatches.BackgroundInventoryUpdater:StartUpdateAll" );
+                Type.GetType( "PeterHan.FastTrack.UIPatches.BackgroundInventoryUpdater, FastTrack" ),
+                "StartUpdateAll" );
             MethodInfo infoRunUpdate = AccessTools.Method(
-                "PeterHan.FastTrack.UIPatches.BackgroundWorldInventory:RunUpdate" );
+                Type.GetType( "PeterHan.FastTrack.UIPatches.BackgroundWorldInventory, FastTrack" ),
+                "RunUpdate" );
             MethodInfo infoSumTotal = AccessTools.Method(
-                "PeterHan.FastTrack.UIPatches.BackgroundWorldInventory:SumTotal" );
+                Type.GetType( "PeterHan.FastTrack.UIPatches.BackgroundWorldInventory, FastTrack" ),
+                "SumTotal" );
             if( infoStartUpdateAll != null && infoRunUpdate != null && infoSumTotal != null )
             {
                 harmony.Patch( infoStartUpdateAll, prefix: new HarmonyMethod(
