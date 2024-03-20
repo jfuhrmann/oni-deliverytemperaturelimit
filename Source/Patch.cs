@@ -18,7 +18,7 @@ namespace DeliveryTemperatureLimit
             if( !__result )
                 return;
             TemperatureLimit limit = TemperatureLimit.Get( destination.gameObject );
-            if( limit == null || limit.IsDisabled())
+            if( limit == null || limit.IsDisabled() || pickup.PrimaryElement == null )
                 return;
             __result = limit.AllowedByTemperature( pickup.PrimaryElement.Temperature );
         }
@@ -163,7 +163,7 @@ namespace DeliveryTemperatureLimit
         public static bool Begin_Hook1( FetchChore rootChore, Pickupable pickupable2 )
         {
             TemperatureLimit limit = TemperatureLimit.Get( rootChore.destination?.gameObject );
-            if( limit == null || limit.IsDisabled())
+            if( limit == null || limit.IsDisabled() || pickupable2.PrimaryElement == null )
                 return true;
             return limit.AllowedByTemperature( pickupable2.PrimaryElement.Temperature );
         }
@@ -383,6 +383,8 @@ namespace DeliveryTemperatureLimit
         public static int UpdatePickups_Hook( FetchManager.Pickup pickup, FetchManager.Pickup pickup2 )
         {
             TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            if( pickup.pickupable.PrimaryElement == null || pickup2.pickupable.PrimaryElement == null )
+                return 0;
             return data.TemperatureIndex( pickup.pickupable.PrimaryElement.Temperature )
                  == data.TemperatureIndex( pickup2.pickupable.PrimaryElement.Temperature ) ? 1 : 0;
         }
@@ -452,6 +454,9 @@ namespace DeliveryTemperatureLimit
         public static int Compare_Hook( FetchManager.Pickup a, FetchManager.Pickup b )
         {
             TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
+            if( a.pickupable.PrimaryElement == null || b.pickupable.PrimaryElement == null )
+                return a.pickupable.PrimaryElement == b.pickupable.PrimaryElement
+                    ? 0 : a.pickupable.PrimaryElement == null ? -1 : 1;
             return data.TemperatureIndex( a.pickupable.PrimaryElement.Temperature )
                 .CompareTo( data.TemperatureIndex( b.pickupable.PrimaryElement.Temperature ));
         }
