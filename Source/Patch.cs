@@ -185,14 +185,9 @@ namespace DeliveryTemperatureLimit
     [HarmonyPatch(typeof(GlobalChoreProvider))]
     public class GlobalChoreProvider_Patch
     {
-        // List of allowed temperature ranges for each tag.
-        private class TagData
-        {
-            // Low/high limit. If not set (null), there's no limit.
-            public List< ValueTuple< int, int >> limits;
-        }
         // GlobalChoreProvider is a singleton, so a single static is enough.
-        private static Dictionary< Tag, TagData > storageFetchableTagsWithTemperature = new Dictionary< Tag, TagData >();
+        private static HashSet< Tag >[] storageFetchableTagsPerTemperatureIndex;
+        private static TemperatureLimit.TemperatureIndexData temperatureIndexData;
 
         [HarmonyPostfix]
         [HarmonyPatch(nameof(ClearableHasDestination))]
@@ -200,24 +195,18 @@ namespace DeliveryTemperatureLimit
         {
             if( !__result ) // Has no destination already without temperature check.
                 return;
-            KPrefabID kPrefabID = pickupable.KPrefabID;
-            TagData tagData;
-            if( !storageFetchableTagsWithTemperature.TryGetValue( kPrefabID.PrefabTag, out tagData ))
+            if( pickupable.PrimaryElement != null )
             {
-                __result = false; // tag not included => not allowed
-                return;
+                int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
+                    .TemperatureIndex( pickupable.PrimaryElement.Temperature );
+                if( storageFetchableTagsPerTemperatureIndex != null
+                    && temperatureIndex < storageFetchableTagsPerTemperatureIndex.Length
+                    && storageFetchableTagsPerTemperatureIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
+                {
+                    return; // ok, there'a storage that allows that tag with that temperature
+                }
             }
-            if( tagData.limits == null ) // All allowed.
-                return;
-            if( pickupable.PrimaryElement == null )
-                return;
-            int temperature = (int)pickupable.PrimaryElement.Temperature;
-            foreach( ValueTuple< int, int > limit in tagData.limits )
-            {
-                if( limit.Item1 <= temperature && temperature < limit.Item2 )
-                    return; // ok, found a valid range
-            }
-            __result = false; // no storage that'd allow the temperature
+            __result = false; // No storage that'd allow the temperature (or possibly temperature data not up to date).
         }
 
         // This function updates a hash of allowed tags for ClearableHasDestination.
@@ -263,51 +252,25 @@ namespace DeliveryTemperatureLimit
 
         public static void UpdateStorageFetchableBits_Hook1()
         {
-            storageFetchableTagsWithTemperature.Clear();
+            temperatureIndexData = TemperatureLimit.getTemperatureIndexData();
+            if( storageFetchableTagsPerTemperatureIndex == null
+                || storageFetchableTagsPerTemperatureIndex.Length != temperatureIndexData.TemperatureIndexCount())
+            {
+                storageFetchableTagsPerTemperatureIndex = new HashSet< Tag >[ temperatureIndexData.TemperatureIndexCount() ];
+                for( int i = 0; i < temperatureIndexData.TemperatureIndexCount(); ++i )
+                    storageFetchableTagsPerTemperatureIndex[ i ] = new HashSet< Tag >();
+            }
         }
 
         public static void UpdateStorageFetchableBits_Hook2(FetchChore chore)
         {
             TemperatureLimit limit = TemperatureLimit.Get( chore.destination.gameObject );
-            if( limit == null || limit.IsDisabled())
-            {
-                foreach( Tag tag in chore.tags )
-                {
-                    TagData tagData;
-                    if( !storageFetchableTagsWithTemperature.TryGetValue( tag, out tagData ))
-                    {
-                        tagData = new TagData(); // limits is set to null
-                        storageFetchableTagsWithTemperature[ tag ] = tagData;
-                    }
-                    else if( tagData.limits != null )
-                        tagData.limits = null; // All allowed.
-                }
-                return;
-            }
-            foreach( Tag tag in chore.tags )
-            {
-                TagData tagData;
-                if( !storageFetchableTagsWithTemperature.TryGetValue( tag, out tagData ))
-                {
-                    tagData = new TagData();
-                    // We will be adding a limit, so set up the list (which means not all are allowed).
-                    tagData.limits = new List< ValueTuple< int, int >>();
-                    storageFetchableTagsWithTemperature[ tag ] = tagData;
-                }
-                if( tagData.limits == null ) // All allowed.
-                    continue;
-                bool found = false;
-                foreach( ValueTuple< int, int > limitItem in tagData.limits )
-                {
-                    if( limitItem.Item1 <= limit.LowLimit && limit.HighLimit < limitItem.Item2 )
-                    {
-                        found = true;
-                        break; // ok, included in another range
-                    }
-                }
-                if( !found )
-                    tagData.limits.Add( ValueTuple.Create( limit.LowLimit, limit.HighLimit ));
-            }
+            int lowIndex = 0;
+            int highIndex = temperatureIndexData.TemperatureIndexCount();
+            if( limit != null && !limit.IsDisabled())
+                ( lowIndex, highIndex ) = temperatureIndexData.TemperatureIndexes( limit );
+            for( int i = lowIndex; i < highIndex; ++i )
+                storageFetchableTagsPerTemperatureIndex[ i ].UnionWith( chore.tags );
         }
     }
 
