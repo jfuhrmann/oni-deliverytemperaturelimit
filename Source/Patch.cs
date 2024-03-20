@@ -191,28 +191,18 @@ namespace DeliveryTemperatureLimit
             // Low/high limit. If not set (null), there's no limit.
             public List< ValueTuple< int, int >> limits;
         }
-        // Stored for each GlobalChoreProvider.
-        private class PerProviderData
-        {
-            public Dictionary< Tag, TagData > tagData = new Dictionary< Tag, TagData >();
-        }
-        private static Dictionary< GlobalChoreProvider, PerProviderData > storageFetchableTagsWithTemperature
-            = new Dictionary< GlobalChoreProvider, PerProviderData >();
-        // Optimization, look it up just once in the first hook.
-        private static PerProviderData currentProvider = null;
+        // GlobalChoreProvider is a singleton, so a single static is enough.
+        private static Dictionary< Tag, TagData > storageFetchableTagsWithTemperature = new Dictionary< Tag, TagData >();
 
         [HarmonyPostfix]
         [HarmonyPatch(nameof(ClearableHasDestination))]
-        public static void ClearableHasDestination(GlobalChoreProvider __instance, ref bool __result, Pickupable pickupable)
+        public static void ClearableHasDestination(ref bool __result, Pickupable pickupable)
         {
             if( !__result ) // Has no destination already without temperature check.
                 return;
-            PerProviderData perProvider = storageFetchableTagsWithTemperature[ __instance ];
-            if( perProvider == null )
-                return;
             KPrefabID kPrefabID = pickupable.KPrefabID;
             TagData tagData;
-            if( !perProvider.tagData.TryGetValue( kPrefabID.PrefabTag, out tagData ))
+            if( !storageFetchableTagsWithTemperature.TryGetValue( kPrefabID.PrefabTag, out tagData ))
             {
                 __result = false; // tag not included => not allowed
                 return;
@@ -237,8 +227,7 @@ namespace DeliveryTemperatureLimit
         public static IEnumerable<CodeInstruction> UpdateStorageFetchableBits(IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
-            // Insert 'UpdateStorageFetchableBits_Hook1( this )' at the beginning.
-            codes.Insert( 0, new CodeInstruction( OpCodes.Ldarg_0 )); // load 'this'
+            // Insert 'UpdateStorageFetchableBits_Hook1()' at the beginning.
             codes.Insert( 1, new CodeInstruction( OpCodes.Call,
                 typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook1 ))));
             bool found = false;
@@ -272,14 +261,9 @@ namespace DeliveryTemperatureLimit
             return codes;
         }
 
-        public static void UpdateStorageFetchableBits_Hook1(GlobalChoreProvider provider)
+        public static void UpdateStorageFetchableBits_Hook1()
         {
-            if( !storageFetchableTagsWithTemperature.TryGetValue( provider, out currentProvider ))
-            {
-                currentProvider = new PerProviderData();
-                storageFetchableTagsWithTemperature[ provider ] = currentProvider;
-            }
-            currentProvider.tagData.Clear();
+            storageFetchableTagsWithTemperature.Clear();
         }
 
         public static void UpdateStorageFetchableBits_Hook2(FetchChore chore)
@@ -290,10 +274,10 @@ namespace DeliveryTemperatureLimit
                 foreach( Tag tag in chore.tags )
                 {
                     TagData tagData;
-                    if( !currentProvider.tagData.TryGetValue( tag, out tagData ))
+                    if( !storageFetchableTagsWithTemperature.TryGetValue( tag, out tagData ))
                     {
                         tagData = new TagData(); // limits is set to null
-                        currentProvider.tagData[ tag ] = tagData;
+                        storageFetchableTagsWithTemperature[ tag ] = tagData;
                     }
                     else if( tagData.limits != null )
                         tagData.limits = null; // All allowed.
@@ -303,12 +287,12 @@ namespace DeliveryTemperatureLimit
             foreach( Tag tag in chore.tags )
             {
                 TagData tagData;
-                if( !currentProvider.tagData.TryGetValue( tag, out tagData ))
+                if( !storageFetchableTagsWithTemperature.TryGetValue( tag, out tagData ))
                 {
                     tagData = new TagData();
                     // We will be adding a limit, so set up the list (which means not all are allowed).
                     tagData.limits = new List< ValueTuple< int, int >>();
-                    currentProvider.tagData[ tag ] = tagData;
+                    storageFetchableTagsWithTemperature[ tag ] = tagData;
                 }
                 if( tagData.limits == null ) // All allowed.
                     continue;
