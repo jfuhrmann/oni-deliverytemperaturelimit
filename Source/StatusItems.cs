@@ -89,7 +89,7 @@ namespace DeliveryTemperatureLimit
                     codes.Insert( i + 2, new CodeInstruction( OpCodes.Dup )); // load 'num3', the code leaves it on the stack
                     codes.Insert( i + 3, new CodeInstruction( OpCodes.Ldloca_S, 37 )); // ref 'num6'
                     codes.Insert( i + 4, new CodeInstruction( OpCodes.Ldloc_S, 28 )); // 'item8'
-                    codes.Insert( i + 5, new CodeInstruction( OpCodes.Ldloc_1 )); // 'id'
+                    codes.Insert( i + 5, new CodeInstruction( OpCodes.Ldloc_0 )); // 'worldContainer' (enumerator)
                     codes.Insert( i + 6, new CodeInstruction( OpCodes.Ldloc_S, 33 )); // 'key'
                     codes.Insert( i + 7, new CodeInstruction( OpCodes.Ldloc_S, 34 )); // 'value2'
                     codes.Insert( i + 8, new CodeInstruction( OpCodes.Ldloc_S, 38 )); // 'minimumAmount'
@@ -104,10 +104,10 @@ namespace DeliveryTemperatureLimit
             return codes;
         }
 
-        public static void Render200ms_Hook( float num3, ref float num6, FetchList2 item8, int id, Tag key,
-            float value2, float minimumAmount )
+        public static void Render200ms_Hook( float num3, ref float num6, FetchList2 item8,
+            IEnumerator< WorldContainer > worldContainer, Tag key, float value2, float minimumAmount )
         {
-            UpdateAvailable( item8, id, key, ref num6, num3, value2, minimumAmount );
+            UpdateAvailable( item8, worldContainer.Current, key, ref num6, num3, value2, minimumAmount );
         }
 
         // FastTrack's code for updating status.
@@ -149,12 +149,12 @@ namespace DeliveryTemperatureLimit
         public static void UpdateStatus_Hook( FetchList2 errand, WorldInventory inventory, Tag tag,
             ref float fetchable, float inStorage, float remaining, float minimumAmount )
         {
-            UpdateAvailable( errand, inventory.WorldContainer.id, tag, ref fetchable, inStorage, remaining, minimumAmount );
+            UpdateAvailable( errand, inventory.WorldContainer, tag, ref fetchable, inStorage, remaining, minimumAmount );
         }
 
         // Shared code for updating status. Possibly compute again available amount based on temperature
         // of items.
-        public static void UpdateAvailable( FetchList2 errand, int worldId, Tag tag,
+        public static void UpdateAvailable( FetchList2 errand, WorldContainer world, Tag tag,
             ref float fetchable, float inStorage, float remaining, float minimumAmount )
         {
             if( inStorage + fetchable < minimumAmount )
@@ -165,18 +165,25 @@ namespace DeliveryTemperatureLimit
             TemperatureLimit.TemperatureIndexData data = TemperatureLimit.getTemperatureIndexData();
             ( int lowIndex, int highIndex ) = data.TemperatureIndexes( limit );
             float total = 0;
-            // This should already include also sub-worlds, so only sum up amounts
-            // for all indexes included in the range.
+            // Sum up amounts for all indexes included in the range.
+            // Make sure to include amounts from sub-worlds and/or the parent world.
             // TODO: Would it be worth it to cache this?
+            int parentWorldId = world.ParentWorldId;
             for( int index = lowIndex; index < highIndex; ++index )
             {
-                // This is a race condition, as the indexes may change before the world amounts
-                // info is updated, so cope with that. The proper value will eventually be calculated.
-                try
+                foreach( WorldContainer world2 in ClusterManager.Instance.WorldContainers )
                 {
-                    total += worldAmounts[ worldId ][ ( tag, index ) ];
-                } catch( KeyNotFoundException )
-                {
+                    if( world2.id == world.id || world2.id == parentWorldId || world2.ParentWorldId == world.id )
+                    {
+                        // This is a race condition, as the indexes may change before the world amounts
+                        // info is updated, so cope with that. The proper value will eventually be calculated.
+                        try
+                        {
+                            total += worldAmounts[ world2.id ][ ( tag, index ) ];
+                        } catch( KeyNotFoundException )
+                        {
+                        }
+                    }
                 }
             }
             // Treat total and available the same. The latter is the sooner, with reserved amounts removed,
