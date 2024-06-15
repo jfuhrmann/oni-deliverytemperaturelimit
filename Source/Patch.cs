@@ -188,8 +188,9 @@ namespace DeliveryTemperatureLimit
     [HarmonyPatch(typeof(GlobalChoreProvider))]
     public class GlobalChoreProvider_Patch
     {
-        // GlobalChoreProvider is a singleton, so a single static is enough.
-        private static HashSet< Tag >[] storageFetchableTagsPerTemperatureIndex;
+        // GlobalChoreProvider is a singleton, but one structure per world is needed.
+        private static Dictionary< int, HashSet< Tag >[] > storageFetchableTagsPerTemperatureIndex
+            = new Dictionary< int, HashSet< Tag >[] >();
         private static TemperatureLimit.TemperatureIndexData temperatureIndexData;
 
         [HarmonyPostfix]
@@ -200,13 +201,17 @@ namespace DeliveryTemperatureLimit
                 return;
             if( pickupable.PrimaryElement != null )
             {
-                int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
-                    .TemperatureIndex( pickupable.PrimaryElement.Temperature );
-                if( storageFetchableTagsPerTemperatureIndex != null
-                    && temperatureIndex < storageFetchableTagsPerTemperatureIndex.Length
-                    && storageFetchableTagsPerTemperatureIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
+                int worldId = pickupable.GetMyWorld().id;
+                HashSet< Tag >[] worldTagsPerIndex;
+                if( storageFetchableTagsPerTemperatureIndex.TryGetValue( worldId, out worldTagsPerIndex ))
                 {
-                    return; // ok, there'a storage that allows that tag with that temperature
+                    int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
+                        .TemperatureIndex( pickupable.PrimaryElement.Temperature );
+                    if( temperatureIndex < worldTagsPerIndex.Length
+                        && worldTagsPerIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
+                    {
+                        return; // ok, there'a storage that allows that tag with that temperature
+                    }
                 }
             }
             __result = false; // No storage that'd allow the temperature (or possibly temperature data not up to date).
@@ -219,13 +224,26 @@ namespace DeliveryTemperatureLimit
         public static IEnumerable<CodeInstruction> UpdateStorageFetchableBits(IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
-            // Insert 'UpdateStorageFetchableBits_Hook1()' at the beginning.
-            codes.Insert( 1, new CodeInstruction( OpCodes.Call,
-                typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook1 ))));
-            bool found = false;
+            bool found1 = false;
+            bool found2 = false;
             for( int i = 0; i < codes.Count; ++i )
             {
 //                Debug.Log("T:" + i + ":" + codes[i].opcode + "::" + (codes[i].operand != null ? codes[i].operand.ToString() : codes[i].operand));
+                // The function has code:
+                // if (!fetchMap.TryGetValue(worldIDsSorted[i], out var value))
+                // Change to:
+                // if (!fetchMap.TryGetValue(UpdateStorageFetchableBits_Hook1(worldIDsSorted[i]), out var value))
+                if( codes[ i ].opcode == OpCodes.Callvirt && codes[ i ].operand.ToString() == "Int32 get_Item(Int32)"
+                    && i + 3 < codes.Count
+                    && codes[ i + 2 ].opcode == OpCodes.Callvirt
+                    && codes[ i + 2 ].operand.ToString() == "Boolean TryGetValue(Int32, System.Collections.Generic.List`1[FetchChore] ByRef)" )
+                {
+                    codes.Insert( i + 1, new CodeInstruction( OpCodes.Dup ));
+                    codes.Insert( i + 2, new CodeInstruction( OpCodes.Call,
+                        typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook1 ))));
+                    found1 = true;
+                }
+
                 // The function has code:
                 // storageFetchableTags.UnionWith(fetchChore.tags);
                 // Append:
@@ -244,29 +262,31 @@ namespace DeliveryTemperatureLimit
                     codes.Insert( i + 5, codes[ i + 2 ].Clone()); // load 'fetchChore'
                     codes.Insert( i + 6, new CodeInstruction( OpCodes.Call,
                         typeof( GlobalChoreProvider_Patch ).GetMethod( nameof( UpdateStorageFetchableBits_Hook2 ))));
-                    found = true;
+                    found2 = true;
                     break;
                 }
             }
-            if(!found)
+            if(!found1 || !found2)
                 Debug.LogWarning("DeliveryTemperatureLimit: Failed to patch GlobalChoreProvider.UpdateStorageFetchableBits()");
             return codes;
         }
 
-        public static void UpdateStorageFetchableBits_Hook1()
+        public static void UpdateStorageFetchableBits_Hook1( int worldId )
         {
             temperatureIndexData = TemperatureLimit.getTemperatureIndexData();
-            if( storageFetchableTagsPerTemperatureIndex == null
-                || storageFetchableTagsPerTemperatureIndex.Length != temperatureIndexData.TemperatureIndexCount())
+            HashSet< Tag >[] worldTagsPerIndex;
+            if( !storageFetchableTagsPerTemperatureIndex.TryGetValue( worldId, out worldTagsPerIndex )
+                || worldTagsPerIndex.Length != temperatureIndexData.TemperatureIndexCount())
             {
-                storageFetchableTagsPerTemperatureIndex = new HashSet< Tag >[ temperatureIndexData.TemperatureIndexCount() ];
+                worldTagsPerIndex = new HashSet< Tag >[ temperatureIndexData.TemperatureIndexCount() ];
                 for( int i = 0; i < temperatureIndexData.TemperatureIndexCount(); ++i )
-                    storageFetchableTagsPerTemperatureIndex[ i ] = new HashSet< Tag >();
+                    worldTagsPerIndex[ i ] = new HashSet< Tag >();
+                storageFetchableTagsPerTemperatureIndex[ worldId ] = worldTagsPerIndex;
             }
             else
             {
                 for( int i = 0; i < temperatureIndexData.TemperatureIndexCount(); ++i )
-                    storageFetchableTagsPerTemperatureIndex[ i ].Clear();
+                    worldTagsPerIndex[ i ].Clear();
             }
         }
 
@@ -275,10 +295,11 @@ namespace DeliveryTemperatureLimit
             TemperatureLimit limit = TemperatureLimit.Get( chore.destination.gameObject );
             int lowIndex = 0;
             int highIndex = temperatureIndexData.TemperatureIndexCount();
+            HashSet< Tag >[] worldTagsPerIndex = storageFetchableTagsPerTemperatureIndex[ chore.destination.GetMyWorld().id ];
             if( limit != null && !limit.IsDisabled())
                 ( lowIndex, highIndex ) = temperatureIndexData.TemperatureIndexes( limit );
             for( int i = lowIndex; i < highIndex; ++i )
-                storageFetchableTagsPerTemperatureIndex[ i ].UnionWith( chore.tags );
+                worldTagsPerIndex[ i ].UnionWith( chore.tags );
         }
     }
 
