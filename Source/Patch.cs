@@ -263,6 +263,11 @@ namespace DeliveryTemperatureLimit
                 for( int i = 0; i < temperatureIndexData.TemperatureIndexCount(); ++i )
                     storageFetchableTagsPerTemperatureIndex[ i ] = new HashSet< Tag >();
             }
+            else
+            {
+                for( int i = 0; i < temperatureIndexData.TemperatureIndexCount(); ++i )
+                    storageFetchableTagsPerTemperatureIndex[ i ].Clear();
+            }
         }
 
         public static void UpdateStorageFetchableBits_Hook2(FetchChore chore)
