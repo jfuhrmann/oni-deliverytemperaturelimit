@@ -201,20 +201,33 @@ namespace DeliveryTemperatureLimit
                 return;
             if( pickupable.PrimaryElement != null )
             {
-                int worldId = pickupable.GetMyWorld().id;
-                HashSet< Tag >[] worldTagsPerIndex;
-                if( storageFetchableTagsPerTemperatureIndex.TryGetValue( worldId, out worldTagsPerIndex ))
+                WorldContainer world = pickupable.GetMyWorld();
+                int worldId = world.id;
+                int parentWorldId = world.ParentWorldId;
+                foreach( WorldContainer world2 in ClusterManager.Instance.WorldContainers )
                 {
-                    int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
-                        .TemperatureIndex( pickupable.PrimaryElement.Temperature );
-                    if( temperatureIndex < worldTagsPerIndex.Length
-                        && worldTagsPerIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
-                    {
-                        return; // ok, there'a storage that allows that tag with that temperature
-                    }
+                    if( world2.id == worldId || world2.id == parentWorldId || world2.ParentWorldId == worldId )
+                        if( WorldHasClearableDestination( world2.id, pickupable ))
+                            return; // ok, there'a storage that allows that tag with that temperature
                 }
             }
             __result = false; // No storage that'd allow the temperature (or possibly temperature data not up to date).
+        }
+
+        private static bool WorldHasClearableDestination( int worldId, Pickupable pickupable )
+        {
+            HashSet< Tag >[] worldTagsPerIndex;
+            if( storageFetchableTagsPerTemperatureIndex.TryGetValue( worldId, out worldTagsPerIndex ))
+            {
+                int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
+                    .TemperatureIndex( pickupable.PrimaryElement.Temperature );
+                if( temperatureIndex < worldTagsPerIndex.Length
+                    && worldTagsPerIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // This function updates a hash of allowed tags for ClearableHasDestination.
