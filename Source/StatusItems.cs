@@ -173,7 +173,7 @@ namespace DeliveryTemperatureLimit
             {
                 foreach( WorldContainer world2 in ClusterManager.Instance.WorldContainers )
                 {
-                    if( world2.id == world.id || world2.id == parentWorldId || world2.ParentWorldId == world.id )
+                    if( world2.ParentWorldId == parentWorldId ) // (Parent points to self if does not exist.)
                     {
                         // This is a race condition, as the indexes may change before the world amounts
                         // info is updated, so cope with that. The proper value will eventually be calculated.
