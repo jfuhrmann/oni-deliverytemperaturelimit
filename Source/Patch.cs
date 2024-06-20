@@ -201,33 +201,22 @@ namespace DeliveryTemperatureLimit
                 return;
             if( pickupable.PrimaryElement != null )
             {
-                WorldContainer world = pickupable.GetMyWorld();
-                int worldId = world.id;
-                int parentWorldId = world.ParentWorldId;
-                foreach( WorldContainer world2 in ClusterManager.Instance.WorldContainers )
+                // GetMyParentWorldId() returns the world itself if there is no parent,
+                // so it is the same for a world and its subworlds.
+                int worldId = pickupable.GetMyWorldId();
+                HashSet< Tag >[] worldTagsPerIndex;
+                if( storageFetchableTagsPerTemperatureIndex.TryGetValue( worldId, out worldTagsPerIndex ))
                 {
-                    if( world2.id == worldId || world2.id == parentWorldId || world2.ParentWorldId == worldId )
-                        if( WorldHasClearableDestination( world2.id, pickupable ))
-                            return; // ok, there'a storage that allows that tag with that temperature
+                    int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
+                        .TemperatureIndex( pickupable.PrimaryElement.Temperature );
+                    if( temperatureIndex < worldTagsPerIndex.Length
+                        && worldTagsPerIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
+                    {
+                        return; // ok, there'a storage that allows that tag with that temperature
+                    }
                 }
             }
             __result = false; // No storage that'd allow the temperature (or possibly temperature data not up to date).
-        }
-
-        private static bool WorldHasClearableDestination( int worldId, Pickupable pickupable )
-        {
-            HashSet< Tag >[] worldTagsPerIndex;
-            if( storageFetchableTagsPerTemperatureIndex.TryGetValue( worldId, out worldTagsPerIndex ))
-            {
-                int temperatureIndex = TemperatureLimit.getTemperatureIndexData()
-                    .TemperatureIndex( pickupable.PrimaryElement.Temperature );
-                if( temperatureIndex < worldTagsPerIndex.Length
-                    && worldTagsPerIndex[ temperatureIndex ].Contains( pickupable.KPrefabID.PrefabTag ))
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         // This function updates a hash of allowed tags for ClearableHasDestination.
@@ -308,7 +297,10 @@ namespace DeliveryTemperatureLimit
             TemperatureLimit limit = TemperatureLimit.Get( chore.destination.gameObject );
             int lowIndex = 0;
             int highIndex = temperatureIndexData.TemperatureIndexCount();
-            HashSet< Tag >[] worldTagsPerIndex = storageFetchableTagsPerTemperatureIndex[ chore.destination.GetMyWorld().id ];
+            // The game code groups this by fetchMap indexes, which are parentWorldId. Since parentWorldId points to the world itself
+            // if there is no parent, this is grouping it by world and its subworlds.
+            int parentWorldId = chore.gameObject.GetMyParentWorldId();
+            HashSet< Tag >[] worldTagsPerIndex = storageFetchableTagsPerTemperatureIndex[ parentWorldId ];
             if( limit != null && !limit.IsDisabled())
                 ( lowIndex, highIndex ) = temperatureIndexData.TemperatureIndexes( limit );
             for( int i = lowIndex; i < highIndex; ++i )
